@@ -1,0 +1,91 @@
+# =====================================================================
+# INNOVEXA - Campus Maintenance System : local development stack
+#
+#   First time:   copy .env.example to .env  (then edit the password)
+#   Start:        docker compose up -d
+#   Stop:         docker compose down          (data is kept)
+#   Full reset:   docker compose down -v       (deletes the database,
+#                 schema.sql + seed.sql run again on next start)
+#
+#   Database  : localhost:5432
+#   pgAdmin   : http://localhost:5050   (optional web UI)
+# =====================================================================
+
+name: campus-maintenance
+
+services:
+  db:
+    image: postgres:16
+    container_name: campus_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_DB: ${POSTGRES_DB:-Campus-maintenance}
+      TZ: Asia/Seoul
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Run only on a brand-new (empty) database, in this order:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/2_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - campus_net
+
+  # Optional web tool to browse tables (alternative to pgAdmin desktop / DBeaver).
+  # Start it with:  docker compose --profile tools up -d
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: campus_pgadmin
+    profiles: ["tools"]
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+    ports:
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - campus_net
+
+  # ---- Add these later when Kayes (backend) and Zehad (frontend) are ready ----
+  #
+  # backend:
+  #   build: ./backend
+  #   container_name: campus_backend
+  #   env_file: .env
+  #   environment:
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@db:5432/${POSTGRES_DB:-Campus-maintenance}
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./uploads:/app/uploads
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   networks:
+  #     - campus_net
+  #
+  # frontend:
+  #   build: ./frontend
+  #   container_name: campus_frontend
+  #   ports:
+  #     - "5173:5173"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - campus_net
+
+volumes:
+  pgdata:
+
+networks:
+  campus_net:

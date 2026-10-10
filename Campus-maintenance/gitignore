@@ -1,0 +1,19 @@
+# secrets and local files
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+
+# uploaded photos and trained models (large)
+uploads/
+ml/models/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
