@@ -1,7 +1,5 @@
 # INNOVEXA full local development stack.
-# From the repository root: docker compose -f Campus-maintenance/docker-compose.yml up --build
-# Frontend: http://localhost:5173 | API docs: http://localhost:8000/docs
-# Database: localhost:5432 | Optional pgAdmin: add --profile tools
+# From repository root: docker compose -f Campus-maintenance/docker-compose.yml up --build
 name: campus-maintenance
 services:
   db:
@@ -19,6 +17,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ../database/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql:ro
       - ../database/seed.sql:/docker-entrypoint-initdb.d/2_seed.sql:ro
+      - ../database/api_compatibility.sql:/docker-entrypoint-initdb.d/3_api_compatibility.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -33,8 +32,17 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@db:5432/${POSTGRES_DB:-campus_maintenance}
       FRONTEND_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-local-development-secret-change-before-deployment}
+      UPLOAD_DIR: /app/uploads
     ports:
       - "8000:8000"
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     depends_on:
       db:
         condition: service_healthy
@@ -48,7 +56,9 @@ services:
       VITE_API_BASE_URL: http://localhost:8000
     ports:
       - "5173:5173"
-    depends_on: [backend]
+    depends_on:
+      backend:
+        condition: service_healthy
     networks: [campus_net]
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -65,5 +75,6 @@ services:
     networks: [campus_net]
 volumes:
   pgdata:
+  uploads:
 networks:
   campus_net:
