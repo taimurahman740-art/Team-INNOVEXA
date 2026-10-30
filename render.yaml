@@ -18,7 +18,6 @@ services:
   - type: web
     name: innovexa-frontend
     runtime: static
-    plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
