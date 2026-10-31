@@ -34,3 +34,18 @@ body{background:radial-gradient(ellipse at 85% 0%,#e6f2ed 0,transparent 34%),#f4
 footer{border-top:1px solid #e7edf1;margin-top:20px;padding-top:16px}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 @media(max-width:700px){.main{padding-top:18px}.hero:after{right:-170px}.header{gap:8px}.connection{font-size:9px}}
+
+.staff-access{margin:18px 0;padding:16px;border:1px solid #dfeae4;border-radius:11px;background:#f7fbf8}
+.staff-access-title{display:flex;align-items:center;gap:10px;color:#176b52}
+.staff-access-title strong,.staff-access-title span{display:block}
+.staff-access-title strong{font-size:12px;color:#244b3c}
+.staff-access-title span,.staff-hint{font-size:10px;color:#7b8c83;margin-top:4px}
+.staff-key-row{display:flex;gap:8px;margin-top:12px}
+.staff-key-row input{min-width:0;flex:1;padding:10px 12px;border:1px solid #dce6e0;border-radius:8px;background:white;font-size:11px}
+.staff-key-row input:focus{outline:0;border-color:#72a992;box-shadow:0 0 0 3px #176b5212}
+.staff-hint{margin-bottom:0}.staff-error{font-size:10px;color:#ad4141;margin:8px 0 0}
+.issue-photo{display:block;max-width:min(100%,360px);max-height:220px;object-fit:cover;border-radius:9px;border:1px solid #e5edf0;margin:10px 0}
+.image-preview-wrap{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.image-preview{max-width:190px;max-height:130px;object-fit:cover;border-radius:8px;border:1px solid #e0e8e3}
+.upload-label input{padding:8px!important;background:#f8faf9!important}
+.ai-note{font-size:9px;color:#6d8378;margin-top:8px}
