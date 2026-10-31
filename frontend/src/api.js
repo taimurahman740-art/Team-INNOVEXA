@@ -1,4 +1,4 @@
-const configuredBase = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+const configuredBase = (import.meta.env.VITE_API_BASE_URL || "https://innovexa-api-lfjx.onrender.com").replace(/\/$/, "");
 const BASE = /^https?:\/\//i.test(configuredBase) ? configuredBase : `https://${configuredBase}`;
 async function request(path, options = {}) {
   const response = await fetch(`${BASE}${path}`, {...options, headers: {"Content-Type": "application/json", ...(options.headers || {})}});
