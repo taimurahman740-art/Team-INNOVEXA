@@ -32,7 +32,7 @@ export default function Staff({issues, live, onUpdate}) {
       <div className="reports-head">
         <div><h2>Staff task centre</h2><p>Open reports, ranked by priority. Staff access is protected.</p></div>
         <select className="status-select" style={{maxWidth: 210}} value={dept} onChange={e => setDept(e.target.value)} aria-label="Filter by department">
-          <option>All departments</option>
+          <option value="All">All departments</option>
           {departments.map(d => <option key={d}>{d}</option>)}
         </select>
       </div>
