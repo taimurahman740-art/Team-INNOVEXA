@@ -13,4 +13,6 @@ class Issue(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="Submitted")
     location: Mapped[str] = mapped_column(String(180), nullable=False)
     department: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    image_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    classification_confidence: Mapped[float | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
