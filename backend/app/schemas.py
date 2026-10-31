@@ -12,6 +12,7 @@ class IssueCreate(BaseModel):
     location: str = Field(min_length=2, max_length=180)
     category: Category = "Other"
     priority: Priority | None = None
+    image_data: str | None = Field(default=None, max_length=2_800_000)
 
 class IssueStatusUpdate(BaseModel):
     status: Status
@@ -26,4 +27,6 @@ class IssueRead(BaseModel):
     status: str
     location: str
     department: str | None = None
+    image_data: str | None = None
+    classification_confidence: float | None = None
     created_at: datetime
