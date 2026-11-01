@@ -9,6 +9,10 @@ from .schemas import IssueCreate, IssueRead, IssueStatusUpdate
 from .services import classify_issue, suggest_category, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
+
+@router.post("/staff/verify", dependencies=[Depends(require_staff)])
+def verify_staff_key():
+    return {"authorized": True}
 IMAGE_PATTERN = re.compile(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$")
 
 def require_staff(x_staff_key: str | None = Header(default=None)):
