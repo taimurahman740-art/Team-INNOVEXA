@@ -9,10 +9,6 @@ from .schemas import IssueCreate, IssueRead, IssueStatusUpdate
 from .services import classify_issue, suggest_category, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
-
-@router.post("/staff/verify", dependencies=[Depends(require_staff)])
-def verify_staff_key():
-    return {"authorized": True}
 IMAGE_PATTERN = re.compile(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$")
 
 def require_staff(x_staff_key: str | None = Header(default=None)):
@@ -21,6 +17,10 @@ def require_staff(x_staff_key: str | None = Header(default=None)):
         raise HTTPException(status_code=503, detail="Staff updates are disabled until STAFF_API_KEY is configured in the backend environment.")
     if not x_staff_key or x_staff_key != expected:
         raise HTTPException(status_code=401, detail="A valid staff access key is required.")
+
+@router.post("/staff/verify", dependencies=[Depends(require_staff)])
+def verify_staff_key():
+    return {"authorized": True}
 
 @router.get("", response_model=list[IssueRead])
 def list_issues(search: str | None = Query(default=None, max_length=180), db: Session = Depends(get_db)):
