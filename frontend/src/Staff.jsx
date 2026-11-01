@@ -1,5 +1,6 @@
 import {useMemo, useState} from "react";
 import {LockKeyhole, MapPin, Wrench, ShieldCheck} from "lucide-react";
+import {verifyStaffKey} from "./api.js";
 
 const rank = {high: 0, medium: 1, low: 2};
 const departments = ["Electrical Maintenance", "Plumbing Maintenance", "Cleaning Services", "Campus Safety", "Facilities Maintenance", "Campus Administration"];
@@ -10,11 +11,26 @@ export default function Staff({issues, live, onUpdate}) {
   const [staffKey, setStaffKey] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [keyError, setKeyError] = useState("");
+  const [checkingKey, setCheckingKey] = useState(false);
   const tasks = useMemo(() => issues
     .filter(i => !["resolved", "closed"].includes((i.status || "").toLowerCase()))
     .filter(i => dept === "All" || i.department === dept)
     .sort((a, b) => level(a.priority) - level(b.priority) || new Date(a.created_at) - new Date(b.created_at)),
   [issues, dept]);
+
+  async function unlockStaffActions() {
+    setCheckingKey(true);
+    setKeyError("");
+    try {
+      await verifyStaffKey(staffKey);
+      setUnlocked(true);
+    } catch (error) {
+      setUnlocked(false);
+      setKeyError(error.message || "Staff authorization failed.");
+    } finally {
+      setCheckingKey(false);
+    }
+  }
 
   async function changeStatus(id, status) {
     try {
@@ -38,7 +54,7 @@ export default function Staff({issues, live, onUpdate}) {
       </div>
       <div className="staff-access">
         <div className="staff-access-title"><ShieldCheck size={18}/><div><strong>Staff authorization</strong><span>Enter the staff key configured by the project administrator.</span></div></div>
-        <div className="staff-key-row"><input type="password" value={staffKey} onChange={e => {setStaffKey(e.target.value);setUnlocked(false);setKeyError("");}} placeholder="Staff access key" autoComplete="off"/><button className="btn btn-primary" disabled={!staffKey.trim()} onClick={() => setUnlocked(true)}><LockKeyhole size={14}/>Unlock actions</button></div>
+        <div className="staff-key-row"><input type="password" value={staffKey} onChange={e => {setStaffKey(e.target.value);setUnlocked(false);setKeyError("");}} placeholder="Staff access key" autoComplete="off"/><button className="btn btn-primary" disabled={!staffKey.trim()} onClick={unlockStaffActions} disabled={!staffKey.trim() || checkingKey}><LockKeyhole size={14}/>{checkingKey ? "Checking…" : "Unlock actions"}</button></div>
         {keyError && <p className="staff-error">{keyError}</p>}
         {!unlocked && <p className="staff-hint">You can view tasks without a key. A valid key is required to change report statuses.</p>}
       </div>
