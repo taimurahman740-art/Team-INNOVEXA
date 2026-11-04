@@ -87,6 +87,28 @@ def suggest_priority(title: str, description: str) -> str:
         return "Medium"
     return "Low"
 
+def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str]]:
+    """Keyword triage aid only; not a validated safety prediction model."""
+    text = f"{title} {description}".lower()
+    rules = [
+        (("fire", "flames", "smoke", "gas leak", "explosion"), 5, "Possible fire, smoke, gas or explosion"),
+        (("electric shock", "electrocution", "sparking", "exposed wire", "live wire"), 5, "Possible electrical danger"),
+        (("collapse", "ceiling falling", "structural failure", "building crack"), 5, "Possible structural danger"),
+        (("injured", "injury", "bleeding", "unconscious", "trapped"), 5, "Possible injury or immediate danger"),
+        (("broken glass", "sharp object", "slippery floor", "flooding", "water leak"), 2, "Potential physical hazard"),
+        (("blocked exit", "emergency exit blocked", "handrail", "loose railing"), 2, "Potential access or fall hazard"),
+    ]
+    score = 0
+    reasons = []
+    for keywords, points, reason in rules:
+        if any(keyword in text for keyword in keywords):
+            score += points
+            reasons.append(reason)
+    score = min(score, 10)
+    level = "High" if score >= 5 else "Moderate" if score >= 2 else "Low"
+    return score, level, reasons
+
+
 def suggest_department(category: str) -> str:
     return {
         "Electrical": "Electrical Maintenance", "Plumbing": "Plumbing Maintenance",
