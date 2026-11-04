@@ -103,6 +103,37 @@ class IssueApiTests(unittest.TestCase):
         )
         self.assertEqual(history.json()[1]["old_status"], "Submitted")
 
+    def test_public_listing_is_readable_without_staff_key(self):
+        self.client.post("/issues", json=self.create_payload())
+        response = self.client.get("/issues")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+
+    def test_resolved_reports_endpoint_requires_staff_key(self):
+        missing = self.client.get("/issues/resolved")
+        self.assertEqual(missing.status_code, 401)
+
+        created = self.client.post("/issues", json=self.create_payload())
+        issue_id = created.json()["id"]
+        headers = {"X-Staff-Key": "test-staff-key"}
+        self.client.patch(
+            f"/issues/{issue_id}/status",
+            json={"status": "Resolved"},
+            headers=headers,
+        )
+        response = self.client.get("/issues/resolved", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["id"] for item in response.json()], [issue_id])
+
+    def test_invalid_status_value_is_rejected(self):
+        created = self.client.post("/issues", json=self.create_payload())
+        response = self.client.patch(
+            f"/issues/{created.json()['id']}/status",
+            json={"status": "Deleted"},
+            headers={"X-Staff-Key": "test-staff-key"},
+        )
+        self.assertEqual(response.status_code, 422)
+
     def test_status_update_for_unknown_issue_returns_404(self):
         response = self.client.patch(
             "/issues/999/status",
