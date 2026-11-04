@@ -29,6 +29,9 @@ class IssueRead(BaseModel):
     department: str | None = None
     image_data: str | None = None
     classification_confidence: float | None = None
+    risk_score: int = 0
+    risk_level: str = "Low"
+    risk_reasons: list[str] = Field(default_factory=list)
     created_at: datetime
 
 
