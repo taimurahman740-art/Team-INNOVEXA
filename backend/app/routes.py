@@ -1,5 +1,6 @@
 import base64
 import binascii
+import hmac
 import os
 import re
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -34,7 +35,7 @@ def require_staff(x_staff_key: str | None = Header(default=None)):
     expected = os.getenv("STAFF_API_KEY")
     if not expected:
         raise HTTPException(status_code=503, detail="Staff updates are disabled until STAFF_API_KEY is configured in the backend environment.")
-    if not x_staff_key or x_staff_key != expected:
+    if not x_staff_key or not hmac.compare_digest(x_staff_key, expected):
         raise HTTPException(status_code=401, detail="A valid staff access key is required.")
 
 @router.post("/staff/verify", dependencies=[Depends(require_staff)])
@@ -46,7 +47,7 @@ def list_issues(search: str | None = Query(default=None, max_length=180), db: Se
     items = db.scalars(select(Issue).order_by(Issue.created_at.desc())).all()
     if search:
         term = search.casefold()
-        items = [i for i in items if term in " ".join([i.title, i.description, i.category, i.location, i.status]).casefold()]
+        items = [i for i in items if term in " ".join([i.title, i.category, i.status, i.department or ""]).casefold()]
     return items
 
 @router.get("/staff", response_model=list[IssueRead], dependencies=[Depends(require_staff)])
