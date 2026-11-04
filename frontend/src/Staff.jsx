@@ -8,6 +8,7 @@ const level = (p) => rank[(p || "").toLowerCase()] ?? 3;
 
 export default function Staff({issues, live, onUpdate}) {
   const [dept, setDept] = useState("All");
+  const [view, setView] = useState("open");
   const [staffKey, setStaffKey] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [keyError, setKeyError] = useState("");
@@ -15,10 +16,10 @@ export default function Staff({issues, live, onUpdate}) {
   const [historyByIssue, setHistoryByIssue] = useState({});
   const [historyLoading, setHistoryLoading] = useState(null);
   const tasks = useMemo(() => issues
-    .filter(i => !["resolved", "closed"].includes((i.status || "").toLowerCase()))
+    .filter(i => view === "all" || (view === "resolved" ? ["resolved", "closed"].includes((i.status || "").toLowerCase()) : !["resolved", "closed"].includes((i.status || "").toLowerCase())))
     .filter(i => dept === "All" || i.department === dept)
     .sort((a, b) => level(a.priority) - level(b.priority) || new Date(a.created_at) - new Date(b.created_at)),
-  [issues, dept]);
+  [issues, dept, view]);
 
   async function unlockStaffActions() {
     setCheckingKey(true);
@@ -73,7 +74,7 @@ export default function Staff({issues, live, onUpdate}) {
         {keyError && <p className="staff-error">{keyError}</p>}
         {!unlocked && <p className="staff-hint">You can view tasks without a key. A valid key is required to change report statuses.</p>}
       </div>
-      <div className="toolbar"><span>{tasks.length} open tasks</span><span>{unlocked ? "Staff key entered" : "View-only mode"}</span></div>
+      <div className="toolbar"><span>{tasks.length} {view === "resolved" ? "resolved reports" : view === "all" ? "reports" : "open tasks"}</span><div style={{display:"flex",gap:6}}><button className="btn btn-light" onClick={() => setView("open")}>Open</button><button className="btn btn-light" onClick={() => setView("resolved")}>Resolved</button><button className="btn btn-light" onClick={() => setView("all")}>All</button><span>{unlocked ? "Staff key entered" : "View-only mode"}</span></div></div>
       <div className="issue-list">
         {tasks.map(i => (
           <article className="issue-row" key={i.id}>
@@ -92,8 +93,8 @@ export default function Staff({issues, live, onUpdate}) {
               {live && typeof i.id === "number" ? (
                 <>
                   <button className="btn btn-light" disabled={!unlocked || historyLoading === i.id} onClick={() => toggleHistory(i.id)}>{historyLoading === i.id ? "Loading…" : historyByIssue[i.id] ? "Hide history" : "View history"}</button>
-                  {i.status === "Submitted" && <button className="btn btn-light" disabled={!unlocked} onClick={() => changeStatus(i.id, "In Progress")}>Start work</button>}
-                  <button className="btn btn-primary" disabled={!unlocked} onClick={() => changeStatus(i.id, "Resolved")}>Mark resolved</button>
+                  {!["resolved", "closed"].includes((i.status || "").toLowerCase()) && i.status === "Submitted" && <button className="btn btn-light" disabled={!unlocked} onClick={() => changeStatus(i.id, "In Progress")}>Start work</button>}
+                  {!["resolved", "closed"].includes((i.status || "").toLowerCase()) && <button className="btn btn-primary" disabled={!unlocked} onClick={() => changeStatus(i.id, "Resolved")}>Mark resolved</button>}
                 </>
               ) : <span className="category">Database unavailable</span>}
             </div>
