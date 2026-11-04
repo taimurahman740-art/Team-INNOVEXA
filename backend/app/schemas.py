@@ -35,6 +35,18 @@ class IssueRead(BaseModel):
     created_at: datetime
 
 
+class IssuePublicRead(BaseModel):
+    """Minimal fields safe for the unauthenticated campus overview."""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    title: str
+    category: str
+    priority: str
+    status: str
+    department: str | None = None
+    created_at: datetime
+
+
 class IssueStatusHistoryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
