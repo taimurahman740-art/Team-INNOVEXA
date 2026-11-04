@@ -1,7 +1,8 @@
 import os
 from contextlib import asynccontextmanager
 from sqlalchemy import inspect, text
-from fastapi import FastAPI
+from sqlalchemy.exc import SQLAlchemyError
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .database import Base, engine
 from . import models
@@ -36,4 +37,10 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    """Report healthy only when the application can reach its database."""
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Database unavailable") from exc
+    return {"status": "ok", "database": "connected"}
