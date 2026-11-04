@@ -58,7 +58,6 @@ class IssueApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         issue = response.json()
         self.assertEqual(issue["status"], "Submitted")
-        self.assertEqual(issue["location"], "Engineering Building Room 201")
         self.assertEqual(issue["risk_level"], "Low")
 
         history = self.client.get(
@@ -130,6 +129,19 @@ class IssueApiTests(unittest.TestCase):
         response = self.client.get("/issues")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
+        public_issue = response.json()[0]
+        self.assertNotIn("description", public_issue)
+        self.assertNotIn("location", public_issue)
+        self.assertNotIn("image_data", public_issue)
+
+    def test_staff_listing_requires_key_and_returns_full_details(self):
+        self.client.post("/issues", json=self.create_payload())
+        denied = self.client.get("/issues/staff")
+        self.assertEqual(denied.status_code, 401)
+        allowed = self.client.get("/issues/staff", headers={"X-Staff-Key": "test-staff-key"})
+        self.assertEqual(allowed.status_code, 200)
+        self.assertEqual(allowed.json()[0]["location"], "Engineering Building Room 201")
+        self.assertIn("description", allowed.json()[0])
 
     def test_resolved_reports_endpoint_requires_staff_key(self):
         missing = self.client.get("/issues/resolved")
