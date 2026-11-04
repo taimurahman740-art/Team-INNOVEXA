@@ -15,7 +15,7 @@ A capstone prototype for reporting campus maintenance issues, suggesting a categ
 2. A small custom Multinomial Naive Bayes text classifier suggests a category.
 3. A keyword-based rule estimates priority; a category map suggests a department. A separate transparent keyword checklist assigns a 0–10 safety triage score, level and reasons.
 4. Staff enter the configured shared staff key and update status.
-5. Reports are stored in PostgreSQL and displayed on the dashboard.
+5. Reports are stored in PostgreSQL and displayed on the dashboard. Staff can switch between open, resolved and all reports, and inspect status history.
 
 ## Technology
 - Frontend: React + Vite
@@ -50,7 +50,10 @@ python -m app.evaluate_classifier
 python -m unittest discover -s tests
 ```
 
-The holdout examples are hand-written and very small. Their scores are only a code-check demonstration, not evidence of real campus performance. Collect representative, consented, labelled campus reports and use a genuinely separate test set before making accuracy claims.
+The evaluator reads the synthetic rows in `data/tongmyong_sample_issues.csv` and reports per-class precision, recall, F1, agreement and a confusion matrix. These are measurements on hand-written synthetic examples, not validated model accuracy or evidence of real campus performance. Collect representative, consented, human-labelled campus reports and reserve an untouched test set before making accuracy claims.
+
+## Sample dataset
+See [backend/data/tongmyong_sample_issues.csv](backend/data/tongmyong_sample_issues.csv). It includes paraphrased public-board issue types and clearly labelled fictional examples. The CSV is for evaluation/demo only and is not automatically loaded into the live model.
 
 ## Deployment
 See [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) for Render configuration and the staff key setup.
