@@ -55,6 +55,15 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     db.refresh(issue)
     return issue
 
+@router.get("/resolved", response_model=list[IssueRead], dependencies=[Depends(require_staff)])
+def list_resolved_issues(db: Session = Depends(get_db)):
+    """Return resolved/closed reports for staff review; requires the staff key."""
+    return db.scalars(
+        select(Issue)
+        .where(Issue.status.in_(["Resolved", "Closed"]))
+        .order_by(Issue.created_at.desc())
+    ).all()
+
 @router.patch("/{issue_id}/status", response_model=IssueRead, dependencies=[Depends(require_staff)])
 def update_status(issue_id: int, payload: IssueStatusUpdate, db: Session = Depends(get_db)):
     issue = db.get(Issue, issue_id)
