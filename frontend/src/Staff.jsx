@@ -1,12 +1,13 @@
 import {useMemo, useState} from "react";
 import {LockKeyhole, MapPin, Wrench, ShieldCheck} from "lucide-react";
-import {verifyStaffKey, getIssueHistory} from "./api.js";
+import {verifyStaffKey, getIssueHistory, getStaffIssues} from "./api.js";
 
 const rank = {high: 0, medium: 1, low: 2};
 const departments = ["Electrical Maintenance", "Plumbing Maintenance", "Cleaning Services", "Campus Safety", "Facilities Maintenance", "Campus Administration"];
 const level = (p) => rank[(p || "").toLowerCase()] ?? 3;
 
 export default function Staff({issues, live, onUpdate}) {
+  const [staffIssues, setStaffIssues] = useState(issues);
   const [dept, setDept] = useState("All");
   const [view, setView] = useState("open");
   const [staffKey, setStaffKey] = useState("");
@@ -16,11 +17,11 @@ export default function Staff({issues, live, onUpdate}) {
   const [checkingKey, setCheckingKey] = useState(false);
   const [historyByIssue, setHistoryByIssue] = useState({});
   const [historyLoading, setHistoryLoading] = useState(null);
-  const tasks = useMemo(() => issues
+  const tasks = useMemo(() => staffIssues
     .filter(i => view === "all" || (view === "resolved" ? ["resolved", "closed"].includes((i.status || "").toLowerCase()) : !["resolved", "closed"].includes((i.status || "").toLowerCase())))
     .filter(i => dept === "All" || i.department === dept)
     .sort((a, b) => level(a.priority) - level(b.priority) || new Date(a.created_at) - new Date(b.created_at)),
-  [issues, dept, view]);
+  [staffIssues, dept, view]);
 
   async function unlockStaffActions() {
     setCheckingKey(true);
@@ -28,6 +29,8 @@ export default function Staff({issues, live, onUpdate}) {
     setKeySuccess("");
     try {
       await verifyStaffKey(staffKey);
+      const detailedIssues = await getStaffIssues(staffKey);
+      setStaffIssues(detailedIssues);
       setUnlocked(true);
       setKeySuccess("Staff access verified. Status updates and report history are now unlocked.");
     } catch (error) {
@@ -54,7 +57,8 @@ export default function Staff({issues, live, onUpdate}) {
 
   async function changeStatus(id, status) {
     try {
-      await onUpdate(id, status, staffKey);
+      const updated = await onUpdate(id, status, staffKey);
+      setStaffIssues(old => old.map(item => item.id === id ? updated : item));
       setKeyError("");
       setUnlocked(true);
     } catch (error) {
@@ -88,10 +92,10 @@ export default function Staff({issues, live, onUpdate}) {
                 <span className={`priority priority-${(i.priority || "Medium").toLowerCase()}`}>{i.priority} priority</span>
                 <span className={`status status-${(i.status || "").toLowerCase().replaceAll(" ", "-")}`}>{i.status}</span>
               </div>
-              <p>{i.description}</p>
-              <div className="ai-note">Safety triage: {i.risk_level || "Low"} ({i.risk_score ?? 0}/10){i.risk_reasons?.length ? ` · ${i.risk_reasons.join("; ")}` : " · No configured risk keywords detected"}</div>
-              <div className="meta"><span><MapPin size={14}/>{i.location}</span><span><Wrench size={14}/>{i.department || "Department pending"}</span></div>
-              {i.image_data && <img className="issue-photo" src={i.image_data} alt="Photo attached to this campus report"/>}
+              <p>{unlocked ? i.description : "Report details are available to authorized staff only."}</p>
+              {unlocked && <div className="ai-note">Safety triage: {i.risk_level || "Low"} ({i.risk_score ?? 0}/10){i.risk_reasons?.length ? ` · ${i.risk_reasons.join("; ")}` : " · No configured risk keywords detected"}</div> }
+              <div className="meta"><span><Wrench size={14}/>{i.department || "Department pending"}</span>{unlocked && i.location && <span><MapPin size={14}/>{i.location}</span>}</div>
+              {unlocked && i.image_data && <img className="issue-photo" src={i.image_data} alt="Photo attached to this campus report"/>}
               {typeof i.classification_confidence === "number" && <div className="ai-note">ML category confidence: {(i.classification_confidence * 100).toFixed(0)}% · Please verify before action</div>}
             </div>
             <div className="issue-side" style={{gap: 6}}>
