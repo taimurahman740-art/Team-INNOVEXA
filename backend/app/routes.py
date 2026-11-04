@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .database import get_db
-from .models import Issue
-from .schemas import IssueCreate, IssueRead, IssueStatusUpdate
+from .models import Issue, IssueStatusHistory
+from .schemas import IssueCreate, IssueRead, IssueStatusUpdate, IssueStatusHistoryRead
 from .services import classify_issue, suggest_category, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
@@ -47,6 +47,8 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
         image_data=payload.image_data, classification_confidence=round(confidence, 4),
     )
     db.add(issue)
+    db.flush()
+    db.add(IssueStatusHistory(issue_id=issue.id, old_status=None, new_status="Submitted", changed_by="system"))
     db.commit()
     db.refresh(issue)
     return issue
@@ -56,7 +58,20 @@ def update_status(issue_id: int, payload: IssueStatusUpdate, db: Session = Depen
     issue = db.get(Issue, issue_id)
     if issue is None:
         raise HTTPException(status_code=404, detail="Issue not found")
-    issue.status = payload.status
-    db.commit()
+    if issue.status != payload.status:
+        db.add(IssueStatusHistory(issue_id=issue.id, old_status=issue.status, new_status=payload.status, changed_by="staff-key"))
+        issue.status = payload.status
+        db.commit()
     db.refresh(issue)
     return issue
+
+
+@router.get("/{issue_id}/history", response_model=list[IssueStatusHistoryRead], dependencies=[Depends(require_staff)])
+def get_issue_history(issue_id: int, db: Session = Depends(get_db)):
+    if db.get(Issue, issue_id) is None:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    return db.scalars(
+        select(IssueStatusHistory)
+        .where(IssueStatusHistory.issue_id == issue_id)
+        .order_by(IssueStatusHistory.changed_at.asc(), IssueStatusHistory.id.asc())
+    ).all()
