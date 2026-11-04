@@ -1,55 +1,62 @@
-"""Evaluate the prototype Naive Bayes classifier on a separate labelled holdout set.
+"""Evaluate the current category classifier against labelled synthetic sample rows.
 
-Run from the backend directory: python -m app.evaluate_classifier
-This is a small demonstration set, not a representative campus benchmark.
+Run from backend/: python -m app.evaluate_classifier
+This reports agreement on a hand-labelled synthetic demonstration set, NOT real-world
+model accuracy. The synthetic examples were authored for this project and are not
+independent campus observations.
 """
+import csv
 from collections import defaultdict
+from pathlib import Path
 from .services import classify_issue
 
-HOLDOUT = [
-    ("Electrical", "The wall outlet is sparking and has an exposed wire."),
-    ("Electrical", "The classroom lamp and ceiling light do not turn on."),
-    ("Plumbing", "Water is leaking from the bathroom faucet."),
-    ("Plumbing", "The toilet drain is blocked and overflowing."),
-    ("Cleaning", "The classroom floor is dirty and needs cleaning."),
-    ("Cleaning", "The rubbish bin is full of garbage."),
-    ("Safety", "There is broken glass on the stairs."),
-    ("Safety", "Smoke is coming from a room and people may be in danger."),
-    ("Facility", "The classroom air conditioner is broken."),
-    ("Facility", "The elevator lift is not working."),
-    ("Other", "I found a student identification card."),
-    ("Other", "The campus Wi-Fi connection is unavailable."),
-]
+DATASET = Path(__file__).resolve().parents[1] / "data" / "tongmyong_sample_issues.csv"
+
+
+def predict_category(title: str, description: str) -> str:
+    label, confidence = classify_issue(title, description)
+    return label if confidence >= 0.30 else "Other"
+
 
 def main():
-    labels = sorted({label for label, _ in HOLDOUT})
-    matrix = {actual: {pred: 0 for pred in labels} for actual in labels}
-    for actual, text in HOLDOUT:
-        predicted, confidence = classify_issue("Campus report", text)
-        if predicted not in matrix[actual]:
-            matrix[actual][predicted] = 0
+    with DATASET.open(encoding="utf-8-sig", newline="") as file:
+        rows = [row for row in csv.DictReader(file) if row.get("source_type") == "synthetic"]
+    if not rows:
+        raise SystemExit("No synthetic rows found in the sample CSV.")
+
+    labels = sorted({row["category"] for row in rows} | {"Other"})
+    matrix = defaultdict(lambda: defaultdict(int))
+    correct = 0
+    for row in rows:
+        actual = row["category"]
+        predicted = predict_category(row["title"], row["description"])
         matrix[actual][predicted] += 1
-        print(f"actual={actual:10} predicted={predicted:10} confidence={confidence:.3f}")
+        correct += actual == predicted
+        print(f'{row["id"]}: expected={actual:10} predicted={predicted:10} {"MATCH" if actual == predicted else "MISMATCH"}')
+
     print("\nPer-class metrics (one-vs-rest):")
-    f1_values = []
+    f1_scores = []
     for label in labels:
-        tp = matrix[label].get(label, 0)
-        fp = sum(matrix[actual].get(label, 0) for actual in labels if actual != label)
-        fn = sum(count for pred, count in matrix[label].items() if pred != label)
+        tp = matrix[label][label]
+        fp = sum(matrix[actual][label] for actual in labels if actual != label)
+        fn = sum(matrix[label][pred] for pred in labels if pred != label)
         precision = tp / (tp + fp) if tp + fp else 0.0
         recall = tp / (tp + fn) if tp + fn else 0.0
         f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-        f1_values.append(f1)
+        if any(row["category"] == label for row in rows):
+            f1_scores.append(f1)
         print(f"{label:10} precision={precision:.3f} recall={recall:.3f} f1={f1:.3f}")
-    total = len(HOLDOUT)
-    correct = sum(matrix[label].get(label, 0) for label in labels)
-    print(f"\nAccuracy: {correct}/{total} = {correct / total:.3f}")
-    print(f"Macro F1: {sum(f1_values) / len(f1_values):.3f}")
-    print("\nConfusion matrix (rows=actual, columns=predicted):")
-    print("actual\\pred".ljust(13) + " ".join(label[:8].rjust(9) for label in labels))
+
+    total = len(rows)
+    print(f"\nSynthetic-set agreement: {correct}/{total} = {correct / total:.3f}")
+    print(f"Macro F1: {sum(f1_scores) / len(f1_scores):.3f}" if f1_scores else "Macro F1: n/a")
+    print("\nConfusion matrix (rows=expected, columns=predicted):")
+    print("expected\\pred".ljust(13) + " ".join(label[:8].rjust(9) for label in labels))
     for actual in labels:
-        print(actual.ljust(13) + " ".join(str(matrix[actual].get(pred, 0)).rjust(9) for pred in labels))
-    print("\nWARNING: this tiny hand-written holdout set is illustrative only; do not report it as real-world campus accuracy.")
+        print(actual.ljust(13) + " ".join(str(matrix[actual][pred]).rjust(9) for pred in labels))
+    print("\nLIMITATION: these hand-written synthetic examples are not a representative or independent campus test set.")
+    print("Do not report this result as validated model accuracy. Obtain anonymised, human-labelled real reports and reserve an untouched test set.")
+
 
 if __name__ == "__main__":
     main()
