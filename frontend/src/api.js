@@ -17,3 +17,4 @@ export const getIssues = () => request("/issues");
 export const postIssue = (issue) => request("/issues", {method: "POST", body: JSON.stringify(issue)});
 export const verifyStaffKey = (staffKey) => request("/issues/staff/verify", {method: "POST", staffKey});
 export const patchStatus = (id, status, staffKey) => request(`/issues/${id}/status`, {method: "PATCH", staffKey, body: JSON.stringify({status})});
+export const getIssueHistory = (id, staffKey) => request(`/issues/${id}/history`, {staffKey});
