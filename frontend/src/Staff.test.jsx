@@ -41,7 +41,8 @@ describe("staff task centre", () => {
     expect(screen.getByRole("button", {name: "Mark resolved"})).toBeDisabled();
     expect(screen.getByRole("button", {name: "View history"})).toBeDisabled();
 
-    api.verifyStaffKey.mockResolvedValue({authorized: true});\n    api.getStaffIssues.mockResolvedValue([issue]);
+    api.verifyStaffKey.mockResolvedValue({authorized: true});
+    api.getStaffIssues.mockResolvedValue([issue]);
     await user.type(screen.getByPlaceholderText("Staff access key"), "test-key");
     await user.click(screen.getByRole("button", {name: "Unlock actions"}));
 
