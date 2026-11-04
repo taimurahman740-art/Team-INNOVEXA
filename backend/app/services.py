@@ -93,17 +93,17 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
     # Regex boundaries avoid accidental matches inside unrelated words. Keep
     # these as transparent triage rules, not claims of validated risk prediction.
     rules = [
-        (r"\\b(fire|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\\b",
+        (r"\b(fire|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\b",
          5, "Possible fire, smoke, gas or explosion"),
-        (r"\\b(electric shock|electrocut(?:ed|ion)|sparking|sparks|exposed wire|live wire|bare wire|burning outlet)\\b",
+        (r"\b(electric shock|electrocut(?:ed|ion)|sparking|sparks|exposed wire|live wire|bare wire|burning outlet)\b",
          5, "Possible electrical danger"),
-        (r"\\b(structural failure|building (?:is )?cracking|large crack in (?:the )?(?:wall|ceiling)|ceiling (?:is )?falling|ceiling collapse|wall collapse|about to collapse)\\b",
+        (r"\b(structural failure|building (?:is )?cracking|large crack in (?:the )?(?:wall|ceiling)|ceiling (?:is )?falling|ceiling collapse|wall collapse|about to collapse)\b",
          5, "Possible structural danger"),
-        (r"\\b(injured|injury|bleeding|unconscious|trapped|someone fell|person fell|electric shock victim)\\b",
+        (r"\b(injured|injury|bleeding|unconscious|trapped|someone fell|person fell|electric shock victim)\b",
          5, "Possible injury or immediate danger"),
-        (r"\\b(broken glass|shattered glass|sharp object|slippery floor|flooding|water leak|water is flooding|water near (?:an? )?(?:electrical|power) (?:socket|outlet|equipment))\\b",
+        (r"\b(broken glass|shattered glass|sharp object|slippery floor|flooding|water leak|water is flooding|water near (?:an? )?(?:electrical|power) (?:socket|outlet|equipment))\b",
          2, "Potential physical hazard"),
-        (r"\\b(blocked exit|emergency exit blocked|fire exit blocked|exit is blocked|loose handrail|loose railing|broken handrail|missing handrail)\\b",
+        (r"\b(blocked exit|emergency exit blocked|fire exit blocked|exit is blocked|loose handrail|loose railing|broken handrail|missing handrail)\b",
          2, "Potential access or fall hazard"),
     ]
     score = 0
