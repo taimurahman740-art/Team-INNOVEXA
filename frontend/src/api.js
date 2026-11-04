@@ -14,6 +14,7 @@ async function request(path, options = {}) {
   return response.json();
 }
 export const getIssues = () => request("/issues");
+export const getStaffIssues = (staffKey) => request("/issues/staff", {staffKey});
 export const postIssue = (issue) => request("/issues", {method: "POST", body: JSON.stringify(issue)});
 export const verifyStaffKey = (staffKey) => request("/issues/staff/verify", {method: "POST", staffKey});
 export const patchStatus = (id, status, staffKey) => request(`/issues/${id}/status`, {method: "PATCH", staffKey, body: JSON.stringify({status})});
