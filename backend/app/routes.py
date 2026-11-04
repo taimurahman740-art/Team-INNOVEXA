@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .database import get_db
 from .models import Issue, IssueStatusHistory
-from .schemas import IssueCreate, IssueRead, IssueStatusUpdate, IssueStatusHistoryRead
+from .schemas import IssueCreate, IssueRead, IssuePublicRead, IssueStatusUpdate, IssueStatusHistoryRead
 from .services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
@@ -41,13 +41,18 @@ def require_staff(x_staff_key: str | None = Header(default=None)):
 def verify_staff_key():
     return {"authorized": True}
 
-@router.get("", response_model=list[IssueRead])
+@router.get("", response_model=list[IssuePublicRead])
 def list_issues(search: str | None = Query(default=None, max_length=180), db: Session = Depends(get_db)):
     items = db.scalars(select(Issue).order_by(Issue.created_at.desc())).all()
     if search:
         term = search.casefold()
         items = [i for i in items if term in " ".join([i.title, i.description, i.category, i.location, i.status]).casefold()]
     return items
+
+@router.get("/staff", response_model=list[IssueRead], dependencies=[Depends(require_staff)])
+def list_staff_issues(db: Session = Depends(get_db)):
+    """Return full report details only to authorized staff."""
+    return db.scalars(select(Issue).order_by(Issue.created_at.desc())).all()
 
 @router.post("", response_model=IssueRead, status_code=201)
 def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
