@@ -23,9 +23,9 @@ def validate_image_data(image_data: str) -> bool:
     except (binascii.Error, ValueError):
         return False
     if mime_type == "png":
-        return image_bytes.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+        return image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
     if mime_type == "jpeg":
-        return image_bytes.startswith(b"\\xff\\xd8\\xff")
+        return image_bytes.startswith(b"\xff\xd8\xff")
     if mime_type == "webp":
         return len(image_bytes) >= 12 and image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP"
     return False
