@@ -1,3 +1,11 @@
+## Sample Tongmyong-style issue dataset
+
+The starter CSV is at [backend/data/tongmyong_sample_issues.csv](backend/data/tongmyong_sample_issues.csv). It contains five paraphrased examples inspired by issue types visible on the public Tongmyong University dormitory repair board, plus 30 fictional synthetic examples.
+
+Public source: https://tu.ac.kr/dormitory/sub06_04.do
+
+The public-board examples are paraphrases, not verified exports or verbatim records. Synthetic rows are fictional and must not be presented as real university incidents. All category, department, priority and risk labels are illustrative, not university-approved. This CSV is for demonstration only and is not currently used to train the live classifier. Do not use it to claim model accuracy or real-world safety performance.
+
 # INNOVEXA — Smart Campus Facility and Issue Management System
 
 A capstone prototype for reporting campus maintenance issues, suggesting a category, routing reports to a department, and tracking staff progress.
