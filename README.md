@@ -64,5 +64,5 @@ See [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) for Render configuration and the 
 - Department assignment is a fixed mapping, not machine learning.
 - Images are stored but are not analyzed by computer vision.
 - A basic status history is recorded, but it identifies changes only as system or shared staff-key activity; it is not an individual audit trail. No student/staff accounts, institutional SSO, individual roles, or notifications are implemented.
-- Reports and uploaded images are publicly visible in this prototype. Do not submit personal, confidential, or sensitive information.
+- The public overview exposes only limited report metadata. Full descriptions, exact locations, images, risk details and status history require the shared staff key. The shared key is still a prototype credential, not individual accounts.
 - For immediate danger, contact campus security or emergency services directly.
