@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .models import Issue, IssueStatusHistory
 from .schemas import IssueCreate, IssueRead, IssueStatusUpdate, IssueStatusHistoryRead
-from .services import classify_issue, suggest_category, suggest_department, suggest_priority
+from .services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 IMAGE_PATTERN = re.compile(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$")
@@ -39,12 +39,14 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
         category = payload.category
     elif confidence < 0.30:
         category = "Other"
+    risk_score, risk_level, risk_reasons = assess_safety_risk(payload.title, payload.description)
     issue = Issue(
         title=payload.title.strip(), description=payload.description.strip(),
         location=payload.location.strip(), category=category,
         priority=payload.priority or suggest_priority(payload.title, payload.description),
         status="Submitted", department=suggest_department(category),
         image_data=payload.image_data, classification_confidence=round(confidence, 4),
+        risk_score=risk_score, risk_level=risk_level, risk_reasons=risk_reasons,
     )
     db.add(issue)
     db.flush()
