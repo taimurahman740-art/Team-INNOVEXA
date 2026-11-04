@@ -12,6 +12,7 @@ export default function Staff({issues, live, onUpdate}) {
   const [staffKey, setStaffKey] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [keyError, setKeyError] = useState("");
+  const [keySuccess, setKeySuccess] = useState("");
   const [checkingKey, setCheckingKey] = useState(false);
   const [historyByIssue, setHistoryByIssue] = useState({});
   const [historyLoading, setHistoryLoading] = useState(null);
@@ -24,12 +25,15 @@ export default function Staff({issues, live, onUpdate}) {
   async function unlockStaffActions() {
     setCheckingKey(true);
     setKeyError("");
+    setKeySuccess("");
     try {
       await verifyStaffKey(staffKey);
       setUnlocked(true);
+      setKeySuccess("Staff access verified. Status updates and report history are now unlocked.");
     } catch (error) {
       setUnlocked(false);
       setKeyError(error.message || "Staff authorization failed.");
+      setKeySuccess("");
     } finally {
       setCheckingKey(false);
     }
@@ -70,8 +74,9 @@ export default function Staff({issues, live, onUpdate}) {
       </div>
       <div className="staff-access">
         <div className="staff-access-title"><ShieldCheck size={18}/><div><strong>Staff authorization</strong><span>Enter the staff key configured by the project administrator.</span></div></div>
-        <div className="staff-key-row"><input type="password" value={staffKey} onChange={e => {setStaffKey(e.target.value);setUnlocked(false);setKeyError("");}} placeholder="Staff access key" autoComplete="off"/><button className="btn btn-primary" onClick={unlockStaffActions} disabled={!staffKey.trim() || checkingKey}><LockKeyhole size={14}/>{checkingKey ? "Checking…" : "Unlock actions"}</button></div>
+        <div className="staff-key-row"><input type="password" value={staffKey} onChange={e => {setStaffKey(e.target.value);setUnlocked(false);setKeyError("");setKeySuccess("");}} placeholder="Staff access key" autoComplete="off"/><button className="btn btn-primary" onClick={unlockStaffActions} disabled={!staffKey.trim() || checkingKey}><LockKeyhole size={14}/>{checkingKey ? "Checking…" : "Unlock actions"}</button></div>
         {keyError && <p className="staff-error">{keyError}</p>}
+        {keySuccess && <p role="status" style={{color:"#16803c",fontWeight:600,marginTop:8}}>{keySuccess}</p>}
         {!unlocked && <p className="staff-hint">You can view tasks without a key. A valid key is required to change report statuses.</p>}
       </div>
       <div className="toolbar"><span>{tasks.length} {view === "resolved" ? "resolved reports" : view === "all" ? "reports" : "open tasks"}</span><div style={{display:"flex",gap:6}}><button className="btn btn-light" onClick={() => setView("open")}>Open</button><button className="btn btn-light" onClick={() => setView("resolved")}>Resolved</button><button className="btn btn-light" onClick={() => setView("all")}>All</button><span>{unlocked ? "Staff key entered" : "View-only mode"}</span></div></div>
