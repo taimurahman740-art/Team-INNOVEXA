@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - '.github/workflows/backend-checks.yml'
   pull_request:
     paths:
@@ -29,3 +30,20 @@ jobs:
         run: python -m unittest discover -s tests
       - name: Run classifier holdout evaluation
         run: python -m app.evaluate_classifier
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        run: npm install --no-package-lock
+      - name: Build frontend
+        run: npm run build
