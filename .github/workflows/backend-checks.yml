@@ -44,8 +44,10 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '22'
-      - name: Install frontend dependencies
-        run: npm install --no-package-lock
+      - name: Generate dependency lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Install locked frontend dependencies
+        run: npm ci
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
       - name: Run frontend interaction tests
