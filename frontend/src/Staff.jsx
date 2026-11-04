@@ -54,7 +54,7 @@ export default function Staff({issues, live, onUpdate}) {
       </div>
       <div className="staff-access">
         <div className="staff-access-title"><ShieldCheck size={18}/><div><strong>Staff authorization</strong><span>Enter the staff key configured by the project administrator.</span></div></div>
-        <div className="staff-key-row"><input type="password" value={staffKey} onChange={e => {setStaffKey(e.target.value);setUnlocked(false);setKeyError("");}} placeholder="Staff access key" autoComplete="off"/><button className="btn btn-primary" disabled={!staffKey.trim()} onClick={unlockStaffActions} disabled={!staffKey.trim() || checkingKey}><LockKeyhole size={14}/>{checkingKey ? "Checking…" : "Unlock actions"}</button></div>
+        <div className="staff-key-row"><input type="password" value={staffKey} onChange={e => {setStaffKey(e.target.value);setUnlocked(false);setKeyError("");}} placeholder="Staff access key" autoComplete="off"/><button className="btn btn-primary" onClick={unlockStaffActions} disabled={!staffKey.trim() || checkingKey}><LockKeyhole size={14}/>{checkingKey ? "Checking…" : "Unlock actions"}</button></div>
         {keyError && <p className="staff-error">{keyError}</p>}
         {!unlocked && <p className="staff-hint">You can view tasks without a key. A valid key is required to change report statuses.</p>}
       </div>
