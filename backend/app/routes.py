@@ -1,3 +1,5 @@
+import base64
+import binascii
 import os
 import re
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -9,7 +11,24 @@ from .schemas import IssueCreate, IssueRead, IssueStatusUpdate, IssueStatusHisto
 from .services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
-IMAGE_PATTERN = re.compile(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$")
+IMAGE_PATTERN = re.compile(r"^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$")
+
+def validate_image_data(image_data: str) -> bool:
+    match = IMAGE_PATTERN.fullmatch(image_data)
+    if not match:
+        return False
+    mime_type, encoded = match.groups()
+    try:
+        image_bytes = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        return False
+    if mime_type == "png":
+        return image_bytes.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+    if mime_type == "jpeg":
+        return image_bytes.startswith(b"\\xff\\xd8\\xff")
+    if mime_type == "webp":
+        return len(image_bytes) >= 12 and image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP"
+    return False
 
 def require_staff(x_staff_key: str | None = Header(default=None)):
     expected = os.getenv("STAFF_API_KEY")
@@ -32,7 +51,7 @@ def list_issues(search: str | None = Query(default=None, max_length=180), db: Se
 
 @router.post("", response_model=IssueRead, status_code=201)
 def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
-    if payload.image_data and not IMAGE_PATTERN.fullmatch(payload.image_data):
+    if payload.image_data and not validate_image_data(payload.image_data):
         raise HTTPException(status_code=422, detail="Image must be PNG, JPEG or WEBP.")
     category, confidence = classify_issue(payload.title, payload.description)
     if payload.category != "Other":
