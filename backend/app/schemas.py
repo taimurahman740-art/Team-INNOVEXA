@@ -30,3 +30,13 @@ class IssueRead(BaseModel):
     image_data: str | None = None
     classification_confidence: float | None = None
     created_at: datetime
+
+
+class IssueStatusHistoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    issue_id: int
+    old_status: str | None = None
+    new_status: str
+    changed_at: datetime
+    changed_by: str
