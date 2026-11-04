@@ -16,3 +16,13 @@ class Issue(Base):
     image_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     classification_confidence: Mapped[float | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class IssueStatusHistory(Base):
+    __tablename__ = "issue_status_history"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    issue_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    old_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    new_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    changed_by: Mapped[str] = mapped_column(String(80), nullable=False, default="staff-key")
