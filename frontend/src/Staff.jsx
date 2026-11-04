@@ -1,6 +1,6 @@
 import {useMemo, useState} from "react";
 import {LockKeyhole, MapPin, Wrench, ShieldCheck} from "lucide-react";
-import {verifyStaffKey} from "./api.js";
+import {verifyStaffKey, getIssueHistory} from "./api.js";
 
 const rank = {high: 0, medium: 1, low: 2};
 const departments = ["Electrical Maintenance", "Plumbing Maintenance", "Cleaning Services", "Campus Safety", "Facilities Maintenance", "Campus Administration"];
@@ -12,6 +12,8 @@ export default function Staff({issues, live, onUpdate}) {
   const [unlocked, setUnlocked] = useState(false);
   const [keyError, setKeyError] = useState("");
   const [checkingKey, setCheckingKey] = useState(false);
+  const [historyByIssue, setHistoryByIssue] = useState({});
+  const [historyLoading, setHistoryLoading] = useState(null);
   const tasks = useMemo(() => issues
     .filter(i => !["resolved", "closed"].includes((i.status || "").toLowerCase()))
     .filter(i => dept === "All" || i.department === dept)
@@ -30,6 +32,19 @@ export default function Staff({issues, live, onUpdate}) {
     } finally {
       setCheckingKey(false);
     }
+  }
+
+  async function toggleHistory(id) {
+    if (historyByIssue[id]) { setHistoryByIssue(old => ({...old, [id]: null})); return; }
+    setHistoryLoading(id);
+    try {
+      const entries = await getIssueHistory(id, staffKey);
+      setHistoryByIssue(old => ({...old, [id]: entries}));
+      setKeyError("");
+    } catch (error) {
+      setKeyError(error.message || "Could not load report history.");
+      if (error.message?.includes("key")) setUnlocked(false);
+    } finally { setHistoryLoading(null); }
   }
 
   async function changeStatus(id, status) {
@@ -75,11 +90,13 @@ export default function Staff({issues, live, onUpdate}) {
             <div className="issue-side" style={{gap: 6}}>
               {live && typeof i.id === "number" ? (
                 <>
+                  <button className="btn btn-light" disabled={!unlocked || historyLoading === i.id} onClick={() => toggleHistory(i.id)}>{historyLoading === i.id ? "Loading…" : historyByIssue[i.id] ? "Hide history" : "View history"}</button>
                   {i.status === "Submitted" && <button className="btn btn-light" disabled={!unlocked} onClick={() => changeStatus(i.id, "In Progress")}>Start work</button>}
                   <button className="btn btn-primary" disabled={!unlocked} onClick={() => changeStatus(i.id, "Resolved")}>Mark resolved</button>
                 </>
               ) : <span className="category">Database unavailable</span>}
             </div>
+            {historyByIssue[i.id] && <div className="status-history"><strong>Status history</strong>{historyByIssue[i.id].map(entry => <div key={entry.id}>{entry.old_status || "Created"} → {entry.new_status} <span>{new Date(entry.changed_at).toLocaleString()} · {entry.changed_by}</span></div>)}</div>}
           </article>
         ))}
       </div>
