@@ -93,7 +93,7 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
     # Regex boundaries avoid accidental matches inside unrelated words. Keep
     # these as transparent triage rules, not claims of validated risk prediction.
     rules = [
-        (r"\b(fire(?! exit\\b)|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\b",
+        (r"\b(fire(?! exit\b)|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\b",
          5, "Possible fire, smoke, gas or explosion"),
         (r"\b(electric shock|electrocut(?:ed|ion)|sparking|sparks|exposed wire|live wire|bare wire|burning outlet)\b",
          5, "Possible electrical danger"),
