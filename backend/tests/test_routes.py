@@ -76,6 +76,28 @@ class IssueApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 422)
 
+    def test_image_mime_type_must_match_file_signature(self):
+        # PNG signature encoded as a data URL is accepted.
+        valid_png = "data:image/png;base64,iVBORw0KGgo="
+        accepted = self.client.post(
+            "/issues", json=self.create_payload(image_data=valid_png)
+        )
+        self.assertEqual(accepted.status_code, 201)
+
+        # A valid PNG cannot be relabelled as JPEG.
+        mismatched = self.client.post(
+            "/issues",
+            json=self.create_payload(image_data="data:image/jpeg;base64,iVBORw0KGgo="),
+        )
+        self.assertEqual(mismatched.status_code, 422)
+
+    def test_malformed_base64_image_is_rejected(self):
+        response = self.client.post(
+            "/issues",
+            json=self.create_payload(image_data="data:image/png;base64,%%%not-base64%%%")
+        )
+        self.assertEqual(response.status_code, 422)
+
     def test_staff_endpoints_reject_missing_or_wrong_key(self):
         missing = self.client.patch("/issues/1/status", json={"status": "Resolved"})
         wrong = self.client.get("/issues/resolved", headers={"X-Staff-Key": "wrong"})
