@@ -46,6 +46,8 @@ jobs:
           node-version: '22'
       - name: Install frontend dependencies
         run: npm install --no-package-lock
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Run frontend interaction tests
         run: npm test
       - name: Build frontend
