@@ -17,6 +17,12 @@ async def lifespan(app: FastAPI):
             connection.execute(text("ALTER TABLE issues ADD COLUMN image_data TEXT"))
         if "classification_confidence" not in columns:
             connection.execute(text("ALTER TABLE issues ADD COLUMN classification_confidence FLOAT"))
+        if "risk_score" not in columns:
+            connection.execute(text("ALTER TABLE issues ADD COLUMN risk_score INTEGER NOT NULL DEFAULT 0"))
+        if "risk_level" not in columns:
+            connection.execute(text("ALTER TABLE issues ADD COLUMN risk_level VARCHAR(20) NOT NULL DEFAULT 'Low'"))
+        if "risk_reasons" not in columns:
+            connection.execute(text("ALTER TABLE issues ADD COLUMN risk_reasons JSON NOT NULL DEFAULT '[]'"))
     yield
 
 app = FastAPI(title="INNOVEXA Smart Campus API", version="0.2.0", lifespan=lifespan)
