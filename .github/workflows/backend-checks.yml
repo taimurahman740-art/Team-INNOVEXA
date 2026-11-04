@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - '.github/workflows/backend-checks.yml'
   workflow_dispatch:
 
@@ -45,5 +46,7 @@ jobs:
           node-version: '22'
       - name: Install frontend dependencies
         run: npm install --no-package-lock
+      - name: Run frontend interaction tests
+        run: npm test
       - name: Build frontend
         run: npm run build
