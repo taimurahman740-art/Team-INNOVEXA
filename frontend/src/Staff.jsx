@@ -83,6 +83,7 @@ export default function Staff({issues, live, onUpdate}) {
                 <span className={`status status-${(i.status || "").toLowerCase().replaceAll(" ", "-")}`}>{i.status}</span>
               </div>
               <p>{i.description}</p>
+              <div className="ai-note">Safety triage: {i.risk_level || "Low"} ({i.risk_score ?? 0}/10){i.risk_reasons?.length ? ` · ${i.risk_reasons.join("; ")}` : " · No configured risk keywords detected"}</div>
               <div className="meta"><span><MapPin size={14}/>{i.location}</span><span><Wrench size={14}/>{i.department || "Department pending"}</span></div>
               {i.image_data && <img className="issue-photo" src={i.image_data} alt="Photo attached to this campus report"/>}
               {typeof i.classification_confidence === "number" && <div className="ai-note">ML category confidence: {(i.classification_confidence * 100).toFixed(0)}% · Please verify before action</div>}
