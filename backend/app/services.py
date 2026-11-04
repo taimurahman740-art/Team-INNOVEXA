@@ -90,18 +90,26 @@ def suggest_priority(title: str, description: str) -> str:
 def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str]]:
     """Keyword triage aid only; not a validated safety prediction model."""
     text = f"{title} {description}".lower()
+    # Regex boundaries avoid accidental matches inside unrelated words. Keep
+    # these as transparent triage rules, not claims of validated risk prediction.
     rules = [
-        (("fire", "flames", "smoke", "gas leak", "explosion"), 5, "Possible fire, smoke, gas or explosion"),
-        (("electric shock", "electrocution", "sparking", "exposed wire", "live wire"), 5, "Possible electrical danger"),
-        (("collapse", "ceiling falling", "structural failure", "building crack"), 5, "Possible structural danger"),
-        (("injured", "injury", "bleeding", "unconscious", "trapped"), 5, "Possible injury or immediate danger"),
-        (("broken glass", "sharp object", "slippery floor", "flooding", "water leak"), 2, "Potential physical hazard"),
-        (("blocked exit", "emergency exit blocked", "handrail", "loose railing"), 2, "Potential access or fall hazard"),
+        (r"\\b(fire|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\\b",
+         5, "Possible fire, smoke, gas or explosion"),
+        (r"\\b(electric shock|electrocut(?:ed|ion)|sparking|sparks|exposed wire|live wire|bare wire|burning outlet)\\b",
+         5, "Possible electrical danger"),
+        (r"\\b(structural failure|building (?:is )?cracking|large crack in (?:the )?(?:wall|ceiling)|ceiling (?:is )?falling|ceiling collapse|wall collapse|about to collapse)\\b",
+         5, "Possible structural danger"),
+        (r"\\b(injured|injury|bleeding|unconscious|trapped|someone fell|person fell|electric shock victim)\\b",
+         5, "Possible injury or immediate danger"),
+        (r"\\b(broken glass|shattered glass|sharp object|slippery floor|flooding|water leak|water is flooding|water near (?:an? )?(?:electrical|power) (?:socket|outlet|equipment))\\b",
+         2, "Potential physical hazard"),
+        (r"\\b(blocked exit|emergency exit blocked|fire exit blocked|exit is blocked|loose handrail|loose railing|broken handrail|missing handrail)\\b",
+         2, "Potential access or fall hazard"),
     ]
     score = 0
     reasons = []
-    for keywords, points, reason in rules:
-        if any(keyword in text for keyword in keywords):
+    for pattern, points, reason in rules:
+        if re.search(pattern, text):
             score += points
             reasons.append(reason)
     score = min(score, 10)
