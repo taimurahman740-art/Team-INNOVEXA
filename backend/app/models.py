@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -15,6 +15,9 @@ class Issue(Base):
     department: Mapped[str | None] = mapped_column(String(80), nullable=True)
     image_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     classification_confidence: Mapped[float | None] = mapped_column(nullable=True)
+    risk_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default='Low')
+    risk_reasons: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
