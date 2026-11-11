@@ -14,6 +14,9 @@ class IssueCreate(BaseModel):
     priority: Priority | None = None
     image_data: str | None = Field(default=None, max_length=2_800_000)
 
+class ImageClassificationRequest(BaseModel):
+    image_data: str = Field(min_length=30, max_length=2_800_000)
+
 class IssueStatusUpdate(BaseModel):
     status: Status
 

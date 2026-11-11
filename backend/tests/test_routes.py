@@ -69,6 +69,29 @@ class IssueApiTests(unittest.TestCase):
         self.assertIsNone(history.json()[0]["old_status"])
         self.assertEqual(history.json()[0]["new_status"], "Submitted")
 
+    def test_image_classification_requires_provider_token(self):
+        with patch.dict(os.environ, {"HF_TOKEN": ""}):
+            response = self.client.post(
+                "/issues/image-classification",
+                json={"image_data": "data:image/png;base64,iVBORw0KGgo="},
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("HF_TOKEN", response.json()["detail"])
+
+    def test_image_classification_returns_model_category(self):
+        with patch.dict(os.environ, {"HF_TOKEN": "test-token"}):
+            with patch(
+                "app.routes.classify_campus_image",
+                return_value={"category": "Plumbing", "score": 0.87, "model": "test-model"},
+            ):
+                response = self.client.post(
+                    "/issues/image-classification",
+                    json={"image_data": "data:image/png;base64,iVBORw0KGgo="},
+                )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["category"], "Plumbing")
+        self.assertEqual(response.json()["score"], 0.87)
+
     def test_invalid_image_data_is_rejected(self):
         response = self.client.post(
             "/issues", json=self.create_payload(image_data="not-an-image")
