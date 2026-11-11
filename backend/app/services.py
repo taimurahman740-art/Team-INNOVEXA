@@ -115,6 +115,15 @@ def suggest_priority(title: str, description: str) -> str:
         return "Medium"
     return "Low"
 
+def _is_negated_hazard(text: str, match_start: int) -> bool:
+    """Avoid triggering a hazard rule when its matched phrase is explicitly negated."""
+    preceding_text = text[max(0, match_start - 32):match_start]
+    return re.search(
+        r"\\b(?:no|not|never|without|free of|isn't|aren't|wasn't|weren't)\\s+(?:any\\s+)?$",
+        preceding_text,
+    ) is not None
+
+
 def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str]]:
     """Keyword triage aid only; not a validated safety prediction model."""
     text = f"{title} {description}".lower()
@@ -152,7 +161,8 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
     score = 0
     reasons = []
     for pattern, points, reason in rules:
-        if re.search(pattern, text):
+        matches = re.finditer(pattern, text)
+        if any(not _is_negated_hazard(text, match.start()) for match in matches):
             score += points
             reasons.append(reason)
     score = min(score, 10)
