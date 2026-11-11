@@ -1,10 +1,12 @@
-## Sample Tongmyong-style issue dataset
+## Tongmyong University dormitory repair dataset
 
-The starter CSV is at [backend/data/tongmyong_sample_issues.csv](backend/data/tongmyong_sample_issues.csv). It contains five paraphrased examples inspired by issue types visible on the public Tongmyong University dormitory repair board, plus 30 fictional synthetic examples.
+The project dataset is [backend/data/tongmyong_sample_issues.csv](backend/data/tongmyong_sample_issues.csv). It is explicitly labelled for Tongmyong University and contains:
+- 14 English paraphrases of publicly visible Tongmyong University dormitory repair-board posts (5 earlier examples and 9 additional posts reviewed on the official board).
+- 30 fictional synthetic examples reserved for demonstration/evaluation only.
 
-Public source: https://tu.ac.kr/dormitory/sub06_04.do
+Official public source: https://www.tu.ac.kr/dormitory/sub06_04.do
 
-The public-board examples are paraphrases, not verified exports or verbatim records. Synthetic rows are fictional and must not be presented as real university incidents. All category, department, priority and risk labels are illustrative, not university-approved. This CSV is for demonstration only and is not currently used to train the live classifier. Do not use it to claim model accuracy or real-world safety performance.
+The public posts are paraphrased, not copied verbatim. Personal names and room numbers are omitted. The category labels are manually assigned for this prototype and are not university-approved labels. The live Naive Bayes classifier now loads the 14 public-board paraphrases from this CSV together with 25 starter training examples. Synthetic rows are excluded from model training and are used only by the evaluation script. The public sample is small and should not be described as a representative dataset of all Tongmyong University dormitory issues.
 
 # INNOVEXA — Smart Campus Facility and Issue Management System
 
@@ -12,7 +14,7 @@ A capstone prototype for reporting campus maintenance issues, suggesting a categ
 
 ## Current workflow
 1. A visitor submits an issue title, description, location, and optional image.
-2. A small custom Multinomial Naive Bayes text classifier suggests a category.
+2. A custom Multinomial Naive Bayes text classifier, trained on starter examples and Tongmyong dormitory public-board paraphrases, suggests a category.
 3. A keyword-based rule estimates priority; a category map suggests a department. A separate transparent keyword checklist assigns a 0–10 safety triage score, level and reasons.
 4. Staff enter the configured shared staff key and update status.
 5. Reports are stored in PostgreSQL and displayed on the dashboard. Staff can switch between open, resolved and all reports, and inspect status history.
@@ -50,16 +52,17 @@ python -m app.evaluate_classifier
 python -m unittest discover -s tests
 ```
 
-The evaluator reads the synthetic rows in `data/tongmyong_sample_issues.csv` and reports per-class precision, recall, F1, agreement and a confusion matrix. These are measurements on hand-written synthetic examples, not validated model accuracy or evidence of real campus performance. Collect representative, consented, human-labelled campus reports and reserve an untouched test set before making accuracy claims.
+The evaluator reads the 30 synthetic rows and reports per-class precision, recall, F1, agreement and a confusion matrix. These are demonstration measurements on hand-written synthetic examples, not validated real-world accuracy. They must not be presented as accuracy on real Tongmyong University reports. A larger, consented and human-labelled campus dataset with an untouched test split is still needed for a defensible real-world performance claim.
 
-## Sample dataset
-See [backend/data/tongmyong_sample_issues.csv](backend/data/tongmyong_sample_issues.csv). It includes paraphrased public-board issue types and clearly labelled fictional examples. The CSV is for evaluation/demo only and is not automatically loaded into the live model.
+## Dataset
+See [backend/data/tongmyong_sample_issues.csv](backend/data/tongmyong_sample_issues.csv). The file distinguishes public-board paraphrases from synthetic examples through its `source_type` field.
 
 ## Deployment
 See [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) for Render configuration and the staff key setup.
 
 ## Limitations and responsible use
 - The classifier is a small demonstration model; confidence is not calibrated.
+- The public-board training examples are paraphrased and manually labelled; they are not a large or representative campus dataset.
 - Priority and safety triage are keyword rules, not AI risk prediction or validated safety assessments. The score can miss hazards and must never be used to decide that a situation is safe.
 - Department assignment is a fixed mapping, not machine learning.
 - Images are stored but are not analyzed by computer vision.
