@@ -1,4 +1,5 @@
 import os
+import secrets
 from contextlib import asynccontextmanager
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,6 +17,18 @@ async def lifespan(app: FastAPI):
         columns = {column["name"] for column in inspect(engine).get_columns("issues")}
         if "tracking_code" not in columns:
             connection.execute(text("ALTER TABLE issues ADD COLUMN tracking_code VARCHAR(32)"))
+        # Backfill opaque codes for existing reports so older submissions can also be tracked.
+        rows_without_codes = connection.execute(
+            text("SELECT id FROM issues WHERE tracking_code IS NULL")
+        ).scalars().all()
+        for issue_id in rows_without_codes:
+            connection.execute(
+                text("UPDATE issues SET tracking_code = :code WHERE id = :issue_id"),
+                {"code": "INX-" + secrets.token_hex(16).upper(), "issue_id": issue_id},
+            )
+        connection.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_issues_tracking_code ON issues (tracking_code)"
+        ))
         if "image_data" not in columns:
             connection.execute(text("ALTER TABLE issues ADD COLUMN image_data TEXT"))
         if "classification_confidence" not in columns:
