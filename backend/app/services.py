@@ -119,7 +119,7 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
     """Keyword triage aid only; not a validated safety prediction model."""
     text = f"{title} {description}".lower()
     rules = [
-        (r"\b(fire(?! exit\b)|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\b",
+        (r"\b(fire(?! (?:exit|extinguisher|alarm)\b)|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\b",
          5, "Possible fire, smoke, gas or explosion"),
         (r"\b(fire alarm (?:is )?(?:not working|broken|disabled|offline)|smoke detector (?:is )?(?:not working|broken|disabled|offline)|fire extinguisher (?:is )?(?:missing|empty|unavailable)|sprinkler system (?:is )?(?:not working|broken|disabled|offline)|emergency lighting (?:is )?(?:not working|broken|out))\b",
          5, "Fire protection or emergency equipment unavailable"),
