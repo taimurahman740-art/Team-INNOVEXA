@@ -176,6 +176,34 @@ class IssueApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_high_risk_report_cannot_be_downgraded_by_submitted_priority(self):
+        response = self.client.post(
+            "/issues",
+            json=self.create_payload(
+                title="Water near electrical outlet",
+                description="Water is dripping beside a live power outlet.",
+                priority="Low",
+            ),
+        )
+        self.assertEqual(response.status_code, 201)
+        issue = response.json()
+        self.assertEqual(issue["risk_level"], "High")
+        self.assertGreaterEqual(issue["risk_score"], 5)
+        self.assertEqual(issue["priority"], "High")
+
+    def test_routine_report_can_keep_submitted_priority(self):
+        response = self.client.post(
+            "/issues",
+            json=self.create_payload(
+                title="Broken classroom chair",
+                description="One chair leg is damaged and needs repair.",
+                priority="Low",
+            ),
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["risk_level"], "Low")
+        self.assertEqual(response.json()["priority"], "Low")
+
 
 if __name__ == "__main__":
     unittest.main()

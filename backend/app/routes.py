@@ -65,10 +65,14 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     elif confidence < 0.30:
         category = "Other"
     risk_score, risk_level, risk_reasons = assess_safety_risk(payload.title, payload.description)
+    # A submitted priority may customize routine reports, but it must never
+    # downgrade a report that the safety rules have flagged as High risk.
+    suggested_priority = suggest_priority(payload.title, payload.description)
+    final_priority = "High" if risk_score >= 5 else (payload.priority or suggested_priority)
     issue = Issue(
         title=payload.title.strip(), description=payload.description.strip(),
         location=payload.location.strip(), category=category,
-        priority=payload.priority or suggest_priority(payload.title, payload.description),
+        priority=final_priority,
         status="Submitted", department=suggest_department(category),
         image_data=payload.image_data, classification_confidence=round(confidence, 4),
         risk_score=risk_score, risk_level=risk_level, risk_reasons=risk_reasons,
