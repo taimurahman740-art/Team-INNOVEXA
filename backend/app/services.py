@@ -131,8 +131,10 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
          5, "Possible injury or immediate danger"),
         (r"\b(broken glass|shattered glass|sharp object|slippery floor|flooding|water leak|water is flooding|water near (?:an? )?(?:electrical|power) (?:socket|outlet|equipment)|water (?:is )?leaking near (?:a |an )?(?:electrical|power) (?:socket|outlet|equipment))\b",
          2, "Potential physical hazard"),
-        (r"\b(blocked exit|emergency exit blocked|fire exit blocked|exit is blocked|loose handrail|loose railing|broken handrail|missing handrail)\b",
-         2, "Potential access or fall hazard"),
+        (r"\b(blocked exit|emergency exit blocked|fire exit blocked|exit is blocked|exit route obstructed|evacuation route blocked|fire escape blocked|emergency egress blocked)\b",
+         5, "Blocked emergency exit or evacuation route"),
+        (r"\b(loose handrail|loose railing|broken handrail|missing handrail)\b",
+         2, "Potential fall hazard"),
     ]
     score = 0
     reasons = []
