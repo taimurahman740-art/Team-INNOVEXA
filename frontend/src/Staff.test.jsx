@@ -14,7 +14,7 @@ vi.mock("./api.js",()=>({
 afterEach(()=>{cleanup();vi.clearAllMocks();});
 
 const issue={id:42,title:"Broken classroom light",description:"The light is not working.",category:"Electrical",priority:"High",status:"Submitted",location:"Engineering Building, Room 101",department:"Electrical Maintenance",assigned_staff_id:null,risk_level:"Low",risk_score:0,risk_reasons:[],created_at:"2026-01-01T00:00:00Z"};
-const staffUser={id:7,email:"tech@campus.test",full_name:"Campus Technician",department:"Electrical Maintenance",role:"staff"};
+const staffUser={id:7,email:"tech@campus.test",full_name:"Campus Technician",department:"Electrical Maintenance",role:"staff",is_active:true};
 const adminUser={id:1,email:"admin@campus.test",full_name:"Campus Admin",department:"Campus Administration",role:"admin"};
 const session=user=>({access_token:"test-session-token",user});
 
