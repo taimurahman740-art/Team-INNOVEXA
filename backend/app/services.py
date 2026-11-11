@@ -123,7 +123,7 @@ def _is_negated_hazard(text: str, match_start: int) -> bool:
         preceding_text,
     )
     coordinated_negation = re.search(
-        r"\bno\s+(?:fire|smoke|gas|water)(?:\s+or\s+(?:fire|smoke|gas|water))*\s+or\s+$",
+        r"\bno\s+(?:fire|smoke|gas|water)(?:\s*,\s*(?:fire|smoke|gas|water))*\s+or\s+$|\bno\s+(?:fire|smoke|gas|water)\s+or\s+$",
         preceding_text,
     )
     return direct_negation is not None or coordinated_negation is not None
