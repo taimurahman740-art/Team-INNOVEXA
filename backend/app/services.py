@@ -124,10 +124,10 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
         (r"\b(?:"
          r"fire alarm (?:is )?(?:not working|broken|disabled|offline|out of service)|"
          r"smoke detector (?:is )?(?:not working|broken|disabled|offline|out of service)|"
-         r"(?:fire )?extinguishers? (?:is )?(?:missing|empty|unavailable|not present|not available|out of service|not working|broken)|"
+         r"(?:fire )?extinguishers? (?:is |are )?(?:missing|empty|unavailable|not present|not available|out of service|not working|broken)|"
          r"(?:missing|empty|unavailable|not present|not available|out of service|not working|broken) (?:fire )?extinguishers?|"
          r"(?:sprinkler|sprinklers|sprinkler system|sprinkler systems) (?:is |are )?(?:not working|broken|disabled|offline|out of service)|"
-         r"(?:emergency lighting|emergency lights) (?:is |are )?(?:not working|broken|out|offline|failed)"
+         r"(?:emergency lighting|emergency lights) (?:is |are |has |have )?(?:not working|broken|out|offline|failed)"
          r")\b",
          5, "Fire protection or emergency equipment unavailable"),
         (r"\b(electric shock|electrocut(?:ed|ion)|sparking|sparks|exposed wire|live wire|bare wire|burning outlet)\b",
