@@ -146,7 +146,6 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
          r"\b(?:fire )?escapes? (?:are |is )?(?:blocked|obstructed)\b|"
          r"\b(?:emergency )?egress (?:is |are )?(?:blocked|obstructed)\b",
          5, "Blocked emergency exit or evacuation route"),
-         5, "Blocked emergency exit or evacuation route"),
         (r"\b(loose handrail|loose railing|broken handrail|missing handrail)\b",
          2, "Potential fall hazard"),
     ]
