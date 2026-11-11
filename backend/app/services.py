@@ -1,13 +1,17 @@
-"""Lightweight supervised text classifier for campus issue triage.
+"""Lightweight supervised text classifier for Tongmyong campus issue triage.
 
-The model is trained on a small, hand-labelled starter dataset. It is a
-capstone prototype: predictions must be reviewed by campus staff.
+Training combines a small, hand-labelled starter set with anonymised,
+English paraphrases of public Tongmyong University dormitory repair posts.
+The public-board examples are a small seed dataset, not a representative
+campus-wide sample. Predictions must be reviewed by campus staff.
 """
+import csv
 import re
 from collections import Counter, defaultdict
 from math import log
+from pathlib import Path
 
-TRAINING_EXAMPLES = [
+STARTER_TRAINING_EXAMPLES = [
     ("Electrical", "broken classroom light lamp bulb not turning on"),
     ("Electrical", "power socket outlet is damaged"),
     ("Electrical", "exposed wire sparks electric shock circuit breaker"),
@@ -35,16 +39,35 @@ TRAINING_EXAMPLES = [
     ("Other", "internet wifi connection is unavailable"),
 ]
 
+DATASET_PATH = Path(__file__).resolve().parents[1] / "data" / "tongmyong_sample_issues.csv"
+
+def load_tongmyong_training_examples() -> list[tuple[str, str]]:
+    """Load public Tongmyong dormitory examples; ignore synthetic evaluation rows."""
+    examples = []
+    with DATASET_PATH.open(encoding="utf-8-sig", newline="") as file:
+        for row in csv.DictReader(file):
+            if row.get("source_type") in {"public_page_paraphrase", "public_board_paraphrase"}:
+                label = row.get("category", "").strip()
+                text = " ".join((row.get("title", ""), row.get("description", ""))).strip()
+                if label and text:
+                    examples.append((label, text))
+    return examples
+
+# The live classifier now actually trains on the Tongmyong-labelled public-board
+# examples as well as the starter examples. Synthetic evaluation rows are excluded.
+TRAINING_EXAMPLES = STARTER_TRAINING_EXAMPLES + load_tongmyong_training_examples()
+
 def _tokens(text: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", text.lower())
 
 class NaiveBayesIssueClassifier:
     """Multinomial Naive Bayes text classifier trained from labelled examples."""
-    def __init__(self):
+    def __init__(self, training_examples=None):
+        self.training_examples = training_examples if training_examples is not None else TRAINING_EXAMPLES
         self.class_docs = Counter()
         self.word_counts = defaultdict(Counter)
         self.vocabulary = set()
-        for label, sample in TRAINING_EXAMPLES:
+        for label, sample in self.training_examples:
             words = _tokens(sample)
             self.class_docs[label] += 1
             self.word_counts[label].update(words)
@@ -54,7 +77,7 @@ class NaiveBayesIssueClassifier:
 
     def predict(self, text: str) -> tuple[str, float]:
         words = _tokens(text)
-        if not words:
+        if not words or not self.total_docs:
             return "Other", 0.0
         scores = {}
         vocab_size = max(len(self.vocabulary), 1)
@@ -90,8 +113,6 @@ def suggest_priority(title: str, description: str) -> str:
 def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str]]:
     """Keyword triage aid only; not a validated safety prediction model."""
     text = f"{title} {description}".lower()
-    # Regex boundaries avoid accidental matches inside unrelated words. Keep
-    # these as transparent triage rules, not claims of validated risk prediction.
     rules = [
         (r"\b(fire(?! exit\b)|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\b",
          5, "Possible fire, smoke, gas or explosion"),
