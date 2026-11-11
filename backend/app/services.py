@@ -118,10 +118,15 @@ def suggest_priority(title: str, description: str) -> str:
 def _is_negated_hazard(text: str, match_start: int) -> bool:
     """Avoid triggering a hazard rule when its matched phrase is explicitly negated."""
     preceding_text = text[max(0, match_start - 32):match_start]
-    return re.search(
+    direct_negation = re.search(
         r"\b(?:no|not|never|without|free of|isn't|aren't|wasn't|weren't)\s+(?:any\s+)?$",
         preceding_text,
-    ) is not None
+    )
+    coordinated_negation = re.search(
+        r"\bno\s+(?:fire|smoke|gas|water)(?:\s+or\s+(?:fire|smoke|gas|water))*\s+or\s+$",
+        preceding_text,
+    )
+    return direct_negation is not None or coordinated_negation is not None
 
 
 def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str]]:
