@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .database import get_db
 from .models import Issue, IssueStatusHistory
-from .schemas import IssueCreate, IssueRead, IssuePublicRead, IssueStatusUpdate, IssueStatusHistoryRead
+from .schemas import IssueCreate, ImageClassificationRequest, IssueRead, IssuePublicRead, IssueStatusUpdate, IssueStatusHistoryRead
+from .image_recognition import classify_campus_image
 from .services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
@@ -83,6 +84,23 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(issue)
     return issue
+
+@router.post("/image-classification")
+def image_classification(payload: ImageClassificationRequest):
+    """Suggest a campus issue category from an uploaded image using hosted zero-shot vision."""
+    if not validate_image_data(payload.image_data):
+        raise HTTPException(status_code=422, detail="Image must be a valid PNG, JPEG or WEBP.")
+    token = os.getenv("HF_TOKEN")
+    if not token:
+        raise HTTPException(status_code=503, detail="Image recognition is not configured yet. Add HF_TOKEN to the backend environment.")
+    match = IMAGE_PATTERN.fullmatch(payload.image_data)
+    image_bytes = base64.b64decode(match.group(2), validate=True)
+    try:
+        result = classify_campus_image(image_bytes, token, os.getenv("HF_IMAGE_MODEL", "openai/clip-vit-large-patch14"))
+    except Exception as exc:
+        # Keep provider details and credentials out of public API responses.
+        raise HTTPException(status_code=502, detail="Image recognition is temporarily unavailable. You can still choose a category manually.") from exc
+    return result
 
 @router.get("/resolved", response_model=list[IssueRead], dependencies=[Depends(require_staff)])
 def list_resolved_issues(db: Session = Depends(get_db)):
