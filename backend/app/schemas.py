@@ -35,6 +35,7 @@ class IssueRead(BaseModel):
     risk_score: int = 0
     risk_level: str = "Low"
     risk_reasons: list[str] = Field(default_factory=list)
+    tracking_code: str | None = None
     created_at: datetime
 
 
@@ -58,3 +59,21 @@ class IssueStatusHistoryRead(BaseModel):
     new_status: str
     changed_at: datetime
     changed_by: str
+
+
+class IssueTrackingEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    old_status: str | None = None
+    new_status: str
+    changed_at: datetime
+
+
+class IssueTrackingRead(BaseModel):
+    tracking_code: str
+    title: str
+    category: str
+    priority: str
+    status: str
+    department: str | None = None
+    created_at: datetime
+    history: list[IssueTrackingEventRead] = Field(default_factory=list)
