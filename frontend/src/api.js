@@ -19,3 +19,4 @@ export const postIssue = (issue) => request("/issues", {method: "POST", body: JS
 export const verifyStaffKey = (staffKey) => request("/issues/staff/verify", {method: "POST", staffKey});
 export const patchStatus = (id, status, staffKey) => request(`/issues/${id}/status`, {method: "PATCH", staffKey, body: JSON.stringify({status})});
 export const getIssueHistory = (id, staffKey) => request(`/issues/${id}/history`, {staffKey});
+export const classifyImage = (image_data) => request("/issues/image-classification", {method: "POST", body: JSON.stringify({image_data})});
