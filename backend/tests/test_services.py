@@ -43,6 +43,31 @@ class TriageServiceTests(unittest.TestCase):
         self.assertGreaterEqual(score, 5)
         self.assertIn("Possible fire, smoke, gas or explosion", reasons)
 
+    def test_broken_fire_alarm_is_high_risk_and_priority(self):
+        title = "Fire alarm not working"
+        description = "The fire alarm system is offline in the dormitory"
+        score, level, reasons = assess_safety_risk(title, description)
+        self.assertEqual(level, "High")
+        self.assertGreaterEqual(score, 5)
+        self.assertIn("Fire protection or emergency equipment unavailable", reasons)
+        self.assertEqual(suggest_priority(title, description), "High")
+
+    def test_missing_fire_extinguisher_is_high_risk(self):
+        score, level, reasons = assess_safety_risk(
+            "Missing fire extinguisher", "The extinguisher is unavailable on this floor"
+        )
+        self.assertEqual(level, "High")
+        self.assertGreaterEqual(score, 5)
+        self.assertIn("Fire protection or emergency equipment unavailable", reasons)
+
+    def test_emergency_lighting_out_is_high_risk(self):
+        score, level, reasons = assess_safety_risk(
+            "Emergency lights out", "Emergency lighting is out in the stairwell"
+        )
+        self.assertEqual(level, "High")
+        self.assertGreaterEqual(score, 5)
+        self.assertIn("Fire protection or emergency equipment unavailable", reasons)
+
     def test_water_near_electrical_outlet_is_high_risk(self):
         score, level, reasons = assess_safety_risk("Water on floor", "Water is leaking near a power outlet")
         self.assertEqual(level, "High")
