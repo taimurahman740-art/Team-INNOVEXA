@@ -58,10 +58,28 @@ class TriageServiceTests(unittest.TestCase):
         self.assertIn("Water near an electrical fixture or equipment", reasons)
         self.assertEqual(suggest_priority(title, description), "High")
 
-    def test_blocked_fire_exit_is_moderate_risk(self):
-        score, level, reasons = assess_safety_risk("Exit blocked", "The fire exit is blocked")
+    def test_blocked_fire_exit_is_high_risk_and_priority(self):
+        title = "Exit blocked"
+        description = "The fire exit is blocked"
+        score, level, reasons = assess_safety_risk(title, description)
+        self.assertEqual(level, "High")
+        self.assertGreaterEqual(score, 5)
+        self.assertIn("Blocked emergency exit or evacuation route", reasons)
+        self.assertEqual(suggest_priority(title, description), "High")
+
+    def test_obstructed_evacuation_route_is_high_risk(self):
+        score, level, reasons = assess_safety_risk(
+            "Hallway obstruction", "The evacuation route is blocked by stored equipment"
+        )
+        self.assertEqual(level, "High")
+        self.assertGreaterEqual(score, 5)
+        self.assertIn("Blocked emergency exit or evacuation route", reasons)
+
+    def test_loose_handrail_remains_moderate_risk(self):
+        score, level, reasons = assess_safety_risk("Loose handrail", "The stair railing is loose")
         self.assertEqual(level, "Moderate")
-        self.assertTrue(reasons)
+        self.assertEqual(score, 2)
+        self.assertIn("Potential fall hazard", reasons)
 
     def test_gas_bill_is_not_a_gas_leak(self):
         score, level, reasons = assess_safety_risk("Gas bill question", "I need help understanding my monthly gas bill")
