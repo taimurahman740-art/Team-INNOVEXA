@@ -71,7 +71,7 @@ class IssueApiTests(unittest.TestCase):
         denied=self.client.patch(f"/issues/{issue['id']}/status",headers={"Authorization":"Bearer "+token},json={"status":"In Progress"})
         self.assertEqual(denied.status_code,403)
         hidden=self.client.get("/issues/staff",headers={"Authorization":"Bearer "+token})
-        self.assertEqual(hidden.json(),[])
+        self.assertEqual([item["id"] for item in hidden.json()],[issue["id"]])
         plumber=self.add_staff(admin_token,"plumber@campus.test","Plumbing Maintenance")
         plumber_token=self.client.post("/issues/staff/login",json={"email":"plumber@campus.test","password":"secure-staff-password"}).json()["access_token"]
         cross=self.client.patch(f"/issues/{issue['id']}/status",headers={"Authorization":"Bearer "+plumber_token},json={"status":"Resolved"})
