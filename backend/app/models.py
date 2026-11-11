@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import secrets
 from sqlalchemy import DateTime, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -18,6 +19,7 @@ class Issue(Base):
     risk_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default='Low')
     risk_reasons: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    tracking_code: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True, default=lambda: "INX-" + secrets.token_hex(6).upper())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
