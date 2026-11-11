@@ -69,6 +69,31 @@ class IssueApiTests(unittest.TestCase):
         self.assertIsNone(history.json()[0]["old_status"])
         self.assertEqual(history.json()[0]["new_status"], "Submitted")
 
+    def test_tracking_code_is_returned_and_public_tracking_exposes_limited_timeline(self):
+        created = self.client.post("/issues", json=self.create_payload())
+        self.assertEqual(created.status_code, 201)
+        code = created.json()["tracking_code"]
+        self.assertTrue(code.startswith("INX-"))
+
+        headers = {"X-Staff-Key": "test-staff-key"}
+        self.client.patch(
+            f"/issues/{created.json()['id']}/status",
+            json={"status": "In Progress"},
+            headers=headers,
+        )
+        tracked = self.client.get(f"/issues/track/{code.lower()}")
+        self.assertEqual(tracked.status_code, 200)
+        data = tracked.json()
+        self.assertEqual(data["status"], "In Progress")
+        self.assertEqual([event["new_status"] for event in data["history"]], ["Submitted", "In Progress"])
+        self.assertNotIn("description", data)
+        self.assertNotIn("location", data)
+        self.assertNotIn("changed_by", data["history"][0])
+
+    def test_unknown_tracking_code_returns_404(self):
+        response = self.client.get("/issues/track/INX-DOESNOTEXIST")
+        self.assertEqual(response.status_code, 404)
+
     def test_image_classification_requires_provider_token(self):
         with patch.dict(os.environ, {"HF_TOKEN": ""}):
             response = self.client.post(
