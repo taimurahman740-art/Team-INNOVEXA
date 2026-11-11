@@ -127,6 +127,29 @@ class TriageServiceTests(unittest.TestCase):
         self.assertGreaterEqual(score, 5)
         self.assertIn("Blocked emergency exit or evacuation route", reasons)
 
+    def test_plural_and_obstructed_emergency_egress_wording_is_high_risk(self):
+        examples = [
+            ("Emergency exits", "Emergency exits are blocked by stored furniture."),
+            ("Blocked fire exits", "Several fire exits are blocked."),
+            ("Evacuation routes", "Evacuation routes are obstructed by boxes."),
+            ("Exit route", "The exit route is obstructed."),
+            ("Fire escapes", "The fire escapes are blocked."),
+        ]
+        for title, description in examples:
+            with self.subTest(title=title, description=description):
+                score, level, reasons = assess_safety_risk(title, description)
+                self.assertEqual(level, "High")
+                self.assertGreaterEqual(score, 5)
+                self.assertIn("Blocked emergency exit or evacuation route", reasons)
+
+    def test_clear_emergency_exit_inspection_is_not_flagged(self):
+        score, level, reasons = assess_safety_risk(
+            "Emergency exit inspection",
+            "The emergency exits are clear and unobstructed.",
+        )
+        self.assertNotIn("Blocked emergency exit or evacuation route", reasons)
+        self.assertNotEqual(level, "High")
+
     def test_loose_handrail_remains_moderate_risk(self):
         score, level, reasons = assess_safety_risk("Loose handrail", "The stair railing is loose")
         self.assertEqual(level, "Moderate")
