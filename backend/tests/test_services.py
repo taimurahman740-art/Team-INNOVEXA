@@ -1,8 +1,17 @@
 """Basic regression tests for issue triage services. Run: python -m unittest discover -s tests"""
 import unittest
-from app.services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
+from app.services import (
+    TRAINING_EXAMPLES, assess_safety_risk, classify_issue,
+    load_tongmyong_training_examples, suggest_category, suggest_department, suggest_priority,
+)
 
 class TriageServiceTests(unittest.TestCase):
+    def test_tongmyong_public_dormitory_examples_are_loaded_into_model(self):
+        public_examples = load_tongmyong_training_examples()
+        self.assertGreaterEqual(len(public_examples), 14)
+        self.assertIn(("Facility", "Dormitory lounge chair needs repair A chair in a residence hall lounge needs repair."), public_examples)
+        self.assertGreater(len(TRAINING_EXAMPLES), 25)
+
     def test_exposed_wire_is_high_priority(self):
         self.assertEqual(suggest_priority("Exposed wire", "Sparking near a socket"), "High")
 
