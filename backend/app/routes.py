@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .database import get_db
 from .models import Issue, IssueStatusHistory
-from .schemas import IssueCreate, ImageClassificationRequest, IssueRead, IssuePublicRead, IssueStatusUpdate, IssueStatusHistoryRead
+from .schemas import IssueCreate, ImageClassificationRequest, IssueRead, IssuePublicRead, IssueStatusUpdate, IssueStatusHistoryRead, IssueTrackingRead
 from .image_recognition import classify_campus_image
 from .services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
 
@@ -50,6 +50,29 @@ def list_issues(search: str | None = Query(default=None, max_length=180), db: Se
         term = search.casefold()
         items = [i for i in items if term in " ".join([i.title, i.category, i.status, i.department or ""]).casefold()]
     return items
+
+@router.get("/track/{tracking_code}", response_model=IssueTrackingRead)
+def track_issue(tracking_code: str, db: Session = Depends(get_db)):
+    """Return only safe progress information for the holder of a report tracking code."""
+    code = tracking_code.strip().upper()
+    issue = db.scalar(select(Issue).where(Issue.tracking_code == code))
+    if issue is None:
+        raise HTTPException(status_code=404, detail="No report found for that tracking code.")
+    history = db.scalars(
+        select(IssueStatusHistory)
+        .where(IssueStatusHistory.issue_id == issue.id)
+        .order_by(IssueStatusHistory.changed_at.asc(), IssueStatusHistory.id.asc())
+    ).all()
+    return {
+        "tracking_code": issue.tracking_code,
+        "title": issue.title,
+        "category": issue.category,
+        "priority": issue.priority,
+        "status": issue.status,
+        "department": issue.department,
+        "created_at": issue.created_at,
+        "history": history,
+    }
 
 @router.get("/staff", response_model=list[IssueRead], dependencies=[Depends(require_staff)])
 def list_staff_issues(db: Session = Depends(get_db)):
