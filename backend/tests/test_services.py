@@ -156,6 +156,17 @@ class TriageServiceTests(unittest.TestCase):
         self.assertEqual(score, 2)
         self.assertIn("Potential fall hazard", reasons)
 
+    def test_explicitly_denied_hazards_are_not_flagged(self):
+        examples = [
+            ("Fire inspection", "No fire or smoke was detected in the building."),
+            ("Gas inspection", "There is no gas leak in the kitchen."),
+            ("Electrical inspection", "No water is leaking near the power outlet."),
+        ]
+        for title, description in examples:
+            with self.subTest(title=title, description=description):
+                score, level, reasons = assess_safety_risk(title, description)
+                self.assertEqual((score, level, reasons), (0, "Low", []))
+
     def test_gas_bill_is_not_a_gas_leak(self):
         score, level, reasons = assess_safety_risk("Gas bill question", "I need help understanding my monthly gas bill")
         self.assertEqual((score, level, reasons), (0, "Low", []))
