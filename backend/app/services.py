@@ -104,6 +104,11 @@ def suggest_category(title: str, description: str) -> str:
 
 def suggest_priority(title: str, description: str) -> str:
     text = f"{title} {description}".lower()
+    # Safety triage overrides routine maintenance priority when an immediate
+    # hazard is detected (for example, water leaking near a light fixture).
+    risk_score, _, _ = assess_safety_risk(title, description)
+    if risk_score >= 5:
+        return "High"
     if any(word in text for word in ("fire", "smoke", "sparking", "exposed wire", "electric shock", "gas leak", "broken glass", "injury", "dangerous", "emergency")):
         return "High"
     if any(word in text for word in ("leak", "broken", "not working", "blocked", "overflow", "damaged", "clogged", "outage")):
@@ -118,6 +123,8 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
          5, "Possible fire, smoke, gas or explosion"),
         (r"\b(electric shock|electrocut(?:ed|ion)|sparking|sparks|exposed wire|live wire|bare wire|burning outlet)\b",
          5, "Possible electrical danger"),
+        (r"\b(?:water|leak(?:ing)?|dripping|drip)\b.{0,100}\b(?:light|lamp|bulb|electrical fixture|wiring|outlet|socket|switch|electrical equipment)\b|\b(?:light|lamp|bulb|electrical fixture|wiring|outlet|socket|switch|electrical equipment)\b.{0,100}\b(?:water|leak(?:ing)?|dripping|drip)\b",
+         5, "Water near an electrical fixture or equipment"),
         (r"\b(structural failure|building (?:is )?cracking|large crack in (?:the )?(?:wall|ceiling)|ceiling (?:is )?falling|ceiling collapse|wall collapse|about to collapse)\b",
          5, "Possible structural danger"),
         (r"\b(injured|injury|bleeding|unconscious|trapped|someone fell|person fell|electric shock victim)\b",
