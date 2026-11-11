@@ -43,11 +43,11 @@ class TriageServiceTests(unittest.TestCase):
         self.assertGreaterEqual(score, 5)
         self.assertIn("Possible fire, smoke, gas or explosion", reasons)
 
-    def test_water_near_electrical_outlet_is_moderate_risk(self):
+    def test_water_near_electrical_outlet_is_high_risk(self):
         score, level, reasons = assess_safety_risk("Water on floor", "Water is leaking near a power outlet")
-        self.assertEqual(level, "Moderate")
-        self.assertGreaterEqual(score, 2)
-        self.assertTrue(reasons)
+        self.assertEqual(level, "High")
+        self.assertGreaterEqual(score, 5)
+        self.assertIn("Water near an electrical fixture or equipment", reasons)
 
     def test_water_leaking_near_bathroom_light_is_high_risk(self):
         title = "Water leaking from bathroom ceiling"
