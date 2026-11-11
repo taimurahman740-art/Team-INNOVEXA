@@ -14,6 +14,8 @@ async def lifespan(app: FastAPI):
     # Additive migration for existing Render databases; existing reports are preserved.
     with engine.begin() as connection:
         columns = {column["name"] for column in inspect(engine).get_columns("issues")}
+        if "tracking_code" not in columns:
+            connection.execute(text("ALTER TABLE issues ADD COLUMN tracking_code VARCHAR(32)"))
         if "image_data" not in columns:
             connection.execute(text("ALTER TABLE issues ADD COLUMN image_data TEXT"))
         if "classification_confidence" not in columns:
