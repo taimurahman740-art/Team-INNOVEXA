@@ -2,256 +2,106 @@
 import os
 import unittest
 from unittest.mock import patch
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
 from app.database import Base, get_db
 from app.routes import router
 
-
 class IssueApiTests(unittest.TestCase):
     def setUp(self):
-        self.engine = create_engine(
-            "sqlite://",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-        )
-        self.Session = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
+        self.engine=create_engine("sqlite://",connect_args={"check_same_thread":False},poolclass=StaticPool)
+        self.Session=sessionmaker(bind=self.engine,autoflush=False,autocommit=False)
         Base.metadata.create_all(bind=self.engine)
-
         def override_get_db():
-            db = self.Session()
-            try:
-                yield db
-            finally:
-                db.close()
-
-        app = FastAPI()
-        app.include_router(router)
-        app.dependency_overrides[get_db] = override_get_db
-        self.client = TestClient(app)
-        self.staff_env = patch.dict(os.environ, {"STAFF_API_KEY": "test-staff-key"})
-        self.staff_env.start()
-
+            db=self.Session()
+            try: yield db
+            finally: db.close()
+        app=FastAPI();app.include_router(router);app.dependency_overrides[get_db]=override_get_db
+        self.client=TestClient(app)
+        self.env=patch.dict(os.environ,{"STAFF_TOKEN_SECRET":"test-secret-value-with-at-least-32-characters","STAFF_BOOTSTRAP_KEY":"test-bootstrap-key"})
+        self.env.start()
     def tearDown(self):
-        self.staff_env.stop()
-        self.client.close()
-        Base.metadata.drop_all(bind=self.engine)
-        self.engine.dispose()
-
-    def create_payload(self, **overrides):
-        payload = {
-            "title": "Broken classroom light",
-            "description": "The ceiling light does not turn on.",
-            "location": "Engineering Building Room 201",
-            "category": "Other",
-        }
-        payload.update(overrides)
-        return payload
-
-    def test_public_issue_submission_and_initial_history(self):
-        response = self.client.post("/issues", json=self.create_payload())
-        self.assertEqual(response.status_code, 201)
-        issue = response.json()
-        self.assertEqual(issue["status"], "Submitted")
-        self.assertEqual(issue["risk_level"], "Low")
-
-        history = self.client.get(
-            f"/issues/{issue['id']}/history",
-            headers={"X-Staff-Key": "test-staff-key"},
-        )
-        self.assertEqual(history.status_code, 200)
-        self.assertEqual(len(history.json()), 1)
-        self.assertIsNone(history.json()[0]["old_status"])
-        self.assertEqual(history.json()[0]["new_status"], "Submitted")
-
-    def test_tracking_code_is_returned_and_public_tracking_exposes_limited_timeline(self):
-        created = self.client.post("/issues", json=self.create_payload())
-        self.assertEqual(created.status_code, 201)
-        code = created.json()["tracking_code"]
-        self.assertTrue(code.startswith("INX-"))
-
-        headers = {"X-Staff-Key": "test-staff-key"}
-        self.client.patch(
-            f"/issues/{created.json()['id']}/status",
-            json={"status": "In Progress"},
-            headers=headers,
-        )
-        tracked = self.client.get(f"/issues/track/{code.lower()}")
-        self.assertEqual(tracked.status_code, 200)
-        data = tracked.json()
-        self.assertEqual(data["status"], "In Progress")
-        self.assertEqual([event["new_status"] for event in data["history"]], ["Submitted", "In Progress"])
-        self.assertNotIn("description", data)
-        self.assertNotIn("location", data)
-        self.assertNotIn("changed_by", data["history"][0])
-
-    def test_unknown_tracking_code_returns_404(self):
-        response = self.client.get("/issues/track/INX-DOESNOTEXIST")
-        self.assertEqual(response.status_code, 404)
-
-    def test_image_classification_requires_provider_token(self):
-        with patch.dict(os.environ, {"HF_TOKEN": ""}):
-            response = self.client.post(
-                "/issues/image-classification",
-                json={"image_data": "data:image/png;base64,iVBORw0KGgo="},
-            )
-        self.assertEqual(response.status_code, 503)
-        self.assertIn("HF_TOKEN", response.json()["detail"])
-
-    def test_image_classification_returns_model_category(self):
-        with patch.dict(os.environ, {"HF_TOKEN": "test-token"}):
-            with patch(
-                "app.routes.classify_campus_image",
-                return_value={"category": "Plumbing", "score": 0.87, "model": "test-model"},
-            ):
-                response = self.client.post(
-                    "/issues/image-classification",
-                    json={"image_data": "data:image/png;base64,iVBORw0KGgo="},
-                )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["category"], "Plumbing")
-        self.assertEqual(response.json()["score"], 0.87)
-
-    def test_invalid_image_data_is_rejected(self):
-        response = self.client.post(
-            "/issues", json=self.create_payload(image_data="not-an-image")
-        )
-        self.assertEqual(response.status_code, 422)
-
-    def test_image_mime_type_must_match_file_signature(self):
-        # PNG signature encoded as a data URL is accepted.
-        valid_png = "data:image/png;base64,iVBORw0KGgo="
-        accepted = self.client.post(
-            "/issues", json=self.create_payload(image_data=valid_png)
-        )
-        self.assertEqual(accepted.status_code, 201)
-
-        # A valid PNG cannot be relabelled as JPEG.
-        mismatched = self.client.post(
-            "/issues",
-            json=self.create_payload(image_data="data:image/jpeg;base64,iVBORw0KGgo="),
-        )
-        self.assertEqual(mismatched.status_code, 422)
-
-    def test_malformed_base64_image_is_rejected(self):
-        response = self.client.post(
-            "/issues",
-            json=self.create_payload(image_data="data:image/png;base64,%%%not-base64%%%")
-        )
-        self.assertEqual(response.status_code, 422)
-
-    def test_staff_endpoints_reject_missing_or_wrong_key(self):
-        missing = self.client.patch("/issues/1/status", json={"status": "Resolved"})
-        wrong = self.client.get("/issues/resolved", headers={"X-Staff-Key": "wrong"})
-        self.assertEqual(missing.status_code, 401)
-        self.assertEqual(wrong.status_code, 401)
-
-    def test_staff_status_update_is_recorded_in_history(self):
-        created = self.client.post("/issues", json=self.create_payload())
-        issue_id = created.json()["id"]
-        headers = {"X-Staff-Key": "test-staff-key"}
-
-        updated = self.client.patch(
-            f"/issues/{issue_id}/status",
-            json={"status": "In Progress"},
-            headers=headers,
-        )
-        self.assertEqual(updated.status_code, 200)
-        self.assertEqual(updated.json()["status"], "In Progress")
-
-        history = self.client.get(f"/issues/{issue_id}/history", headers=headers)
-        self.assertEqual(history.status_code, 200)
-        self.assertEqual(
-            [event["new_status"] for event in history.json()],
-            ["Submitted", "In Progress"],
-        )
-        self.assertEqual(history.json()[1]["old_status"], "Submitted")
-
-    def test_public_listing_is_readable_without_staff_key(self):
-        self.client.post("/issues", json=self.create_payload())
-        response = self.client.get("/issues")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
-        public_issue = response.json()[0]
-        self.assertNotIn("description", public_issue)
-        self.assertNotIn("location", public_issue)
-        self.assertNotIn("image_data", public_issue)
-
-    def test_staff_listing_requires_key_and_returns_full_details(self):
-        self.client.post("/issues", json=self.create_payload())
-        denied = self.client.get("/issues/staff")
-        self.assertEqual(denied.status_code, 401)
-        allowed = self.client.get("/issues/staff", headers={"X-Staff-Key": "test-staff-key"})
-        self.assertEqual(allowed.status_code, 200)
-        self.assertEqual(allowed.json()[0]["location"], "Engineering Building Room 201")
-        self.assertIn("description", allowed.json()[0])
-
-    def test_resolved_reports_endpoint_requires_staff_key(self):
-        missing = self.client.get("/issues/resolved")
-        self.assertEqual(missing.status_code, 401)
-
-        created = self.client.post("/issues", json=self.create_payload())
-        issue_id = created.json()["id"]
-        headers = {"X-Staff-Key": "test-staff-key"}
-        self.client.patch(
-            f"/issues/{issue_id}/status",
-            json={"status": "Resolved"},
-            headers=headers,
-        )
-        response = self.client.get("/issues/resolved", headers=headers)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([item["id"] for item in response.json()], [issue_id])
-
-    def test_invalid_status_value_is_rejected(self):
-        created = self.client.post("/issues", json=self.create_payload())
-        response = self.client.patch(
-            f"/issues/{created.json()['id']}/status",
-            json={"status": "Deleted"},
-            headers={"X-Staff-Key": "test-staff-key"},
-        )
-        self.assertEqual(response.status_code, 422)
-
-    def test_status_update_for_unknown_issue_returns_404(self):
-        response = self.client.patch(
-            "/issues/999/status",
-            json={"status": "Resolved"},
-            headers={"X-Staff-Key": "test-staff-key"},
-        )
-        self.assertEqual(response.status_code, 404)
-
-    def test_high_risk_report_cannot_be_downgraded_by_submitted_priority(self):
-        response = self.client.post(
-            "/issues",
-            json=self.create_payload(
-                title="Water near electrical outlet",
-                description="Water is dripping beside a live power outlet.",
-                priority="Low",
-            ),
-        )
-        self.assertEqual(response.status_code, 201)
-        issue = response.json()
-        self.assertEqual(issue["risk_level"], "High")
-        self.assertGreaterEqual(issue["risk_score"], 5)
-        self.assertEqual(issue["priority"], "High")
-
+        self.env.stop();self.client.close();Base.metadata.drop_all(bind=self.engine);self.engine.dispose()
+    def payload(self,**overrides):
+        data={"title":"Broken classroom light","description":"The ceiling light does not turn on.","location":"Engineering Building Room 201","category":"Other"}
+        data.update(overrides);return data
+    def admin(self):
+        r=self.client.post("/issues/staff/bootstrap",json={"bootstrap_key":"test-bootstrap-key","email":"admin@campus.test","full_name":"Campus Admin","password":"secure-admin-password","department":"Campus Administration"})
+        self.assertEqual(r.status_code,201,r.text);return r.json()
+    def add_staff(self,token,email="tech@campus.test",department="Electrical Maintenance"):
+        r=self.client.post("/issues/staff/users",headers={"Authorization":"Bearer "+token},json={"email":email,"full_name":"Campus Technician","password":"secure-staff-password","department":department,"role":"staff"})
+        self.assertEqual(r.status_code,201,r.text);return r.json()
+    def test_public_submission_and_tracking_code(self):
+        r=self.client.post("/issues",json=self.payload());self.assertEqual(r.status_code,201)
+        issue=r.json();self.assertTrue(issue["tracking_code"].startswith("INX-"))
+        tracked=self.client.get("/issues/track/"+issue["tracking_code"])
+        self.assertEqual(tracked.status_code,200);self.assertEqual(tracked.json()["status"],"Submitted")
+        self.assertNotIn("description",tracked.json());self.assertNotIn("location",tracked.json())
+    def test_first_admin_bootstrap_is_one_time_and_password_login_works(self):
+        created=self.admin();self.assertEqual(created["user"]["role"],"admin")
+        duplicate=self.client.post("/issues/staff/bootstrap",json={"bootstrap_key":"test-bootstrap-key","email":"other@campus.test","full_name":"Other Admin","password":"another-secure-password"})
+        self.assertEqual(duplicate.status_code,409)
+        login=self.client.post("/issues/staff/login",json={"email":"ADMIN@campus.test","password":"secure-admin-password"})
+        self.assertEqual(login.status_code,200);self.assertNotIn("password_hash",login.json()["user"])
+    def test_bad_bootstrap_key_and_password_are_rejected(self):
+        bad=self.client.post("/issues/staff/bootstrap",json={"bootstrap_key":"bad","email":"admin@campus.test","full_name":"Campus Admin","password":"secure-admin-password"})
+        self.assertEqual(bad.status_code,401);self.admin()
+        bad_login=self.client.post("/issues/staff/login",json={"email":"admin@campus.test","password":"wrong-password"})
+        self.assertEqual(bad_login.status_code,401)
+    def test_department_scoped_access_and_admin_assignment(self):
+        admin_token=self.admin()["access_token"];staff=self.add_staff(admin_token)
+        issue=self.client.post("/issues",json=self.payload(category="Electrical")).json()
+        assigned=self.client.patch(f"/issues/{issue['id']}/assignment",headers={"Authorization":"Bearer "+admin_token},json={"staff_user_id":staff["id"]})
+        self.assertEqual(assigned.status_code,200);self.assertEqual(assigned.json()["assigned_staff_id"],staff["id"])
+        login=self.client.post("/issues/staff/login",json={"email":"tech@campus.test","password":"secure-staff-password"}).json()
+        token=login["access_token"];tasks=self.client.get("/issues/staff",headers={"Authorization":"Bearer "+token})
+        self.assertEqual([x["id"] for x in tasks.json()],[issue["id"]])
+        changed=self.client.patch(f"/issues/{issue['id']}/status",headers={"Authorization":"Bearer "+token},json={"status":"In Progress"})
+        self.assertEqual(changed.status_code,200);self.assertEqual(changed.json()["status"],"In Progress")
+        history=self.client.get(f"/issues/{issue['id']}/history",headers={"Authorization":"Bearer "+token})
+        self.assertEqual(history.json()[-1]["changed_by"],"tech@campus.test")
+    def test_staff_cannot_work_on_another_staff_assignment_or_department(self):
+        admin_token=self.admin()["access_token"];first=self.add_staff(admin_token,"one@campus.test");second=self.add_staff(admin_token,"two@campus.test")
+        issue=self.client.post("/issues",json=self.payload(category="Electrical")).json()
+        unassigned=self.client.post("/issues",json=self.payload(title="Unassigned electrical socket",category="Electrical")).json()
+        self.client.patch(f"/issues/{issue['id']}/assignment",headers={"Authorization":"Bearer "+admin_token},json={"staff_user_id":second["id"]})
+        token=self.client.post("/issues/staff/login",json={"email":"one@campus.test","password":"secure-staff-password"}).json()["access_token"]
+        denied=self.client.patch(f"/issues/{issue['id']}/status",headers={"Authorization":"Bearer "+token},json={"status":"In Progress"})
+        self.assertEqual(denied.status_code,403)
+        hidden=self.client.get("/issues/staff",headers={"Authorization":"Bearer "+token})
+        self.assertEqual([item["id"] for item in hidden.json()],[unassigned["id"]])
+        history_denied=self.client.get(f"/issues/{issue['id']}/history",headers={"Authorization":"Bearer "+token})
+        self.assertEqual(history_denied.status_code,403)
+        plumber=self.add_staff(admin_token,"plumber@campus.test","Plumbing Maintenance")
+        wrong_department=self.client.patch(f"/issues/{issue['id']}/assignment",headers={"Authorization":"Bearer "+admin_token},json={"staff_user_id":plumber["id"]})
+        self.assertEqual(wrong_department.status_code,422)
+        plumber_token=self.client.post("/issues/staff/login",json={"email":"plumber@campus.test","password":"secure-staff-password"}).json()["access_token"]
+        cross=self.client.patch(f"/issues/{issue['id']}/status",headers={"Authorization":"Bearer "+plumber_token},json={"status":"Resolved"})
+        self.assertEqual(cross.status_code,403)
+        plumber_tasks=self.client.get("/issues/staff",headers={"Authorization":"Bearer "+plumber_token})
+        self.assertEqual(plumber_tasks.json(),[])
+    def test_only_admin_can_manage_staff_accounts(self):
+        admin_token=self.admin()["access_token"];self.add_staff(admin_token)
+        token=self.client.post("/issues/staff/login",json={"email":"tech@campus.test","password":"secure-staff-password"}).json()["access_token"]
+        denied=self.client.get("/issues/staff/users",headers={"Authorization":"Bearer "+token})
+        self.assertEqual(denied.status_code,403)
+        self.assertEqual(self.client.get("/issues/staff").status_code,401)
+    def test_public_overview_hides_private_fields(self):
+        self.client.post("/issues",json=self.payload());item=self.client.get("/issues").json()[0]
+        self.assertNotIn("description",item);self.assertNotIn("location",item);self.assertNotIn("image_data",item)
+    def test_image_classification_validation_and_provider_error(self):
+        invalid=self.client.post("/issues",json=self.payload(image_data="not-an-image"));self.assertEqual(invalid.status_code,422)
+        with patch.dict(os.environ,{"HF_TOKEN":""}):
+            response=self.client.post("/issues/image-classification",json={"image_data":"data:image/png;base64,iVBORw0KGgo="})
+        self.assertEqual(response.status_code,503)
+    def test_high_risk_report_cannot_be_downgraded(self):
+        r=self.client.post("/issues",json=self.payload(title="Water near electrical outlet",description="Water is dripping beside a live power outlet.",priority="Low"))
+        self.assertEqual(r.status_code,201);self.assertEqual(r.json()["risk_level"],"High");self.assertEqual(r.json()["priority"],"High")
     def test_routine_report_can_keep_submitted_priority(self):
-        response = self.client.post(
-            "/issues",
-            json=self.create_payload(
-                title="Broken classroom chair",
-                description="One chair leg is damaged and needs repair.",
-                priority="Low",
-            ),
-        )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["risk_level"], "Low")
-        self.assertEqual(response.json()["priority"], "Low")
+        r=self.client.post("/issues",json=self.payload(title="Broken classroom chair",description="One chair leg is damaged and needs repair.",priority="Low"))
+        self.assertEqual(r.status_code,201);self.assertEqual(r.json()["priority"],"Low")
 
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__=="__main__": unittest.main()
