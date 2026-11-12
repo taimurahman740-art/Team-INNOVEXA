@@ -66,16 +66,23 @@ class IssueApiTests(unittest.TestCase):
     def test_staff_cannot_work_on_another_staff_assignment_or_department(self):
         admin_token=self.admin()["access_token"];first=self.add_staff(admin_token,"one@campus.test");second=self.add_staff(admin_token,"two@campus.test")
         issue=self.client.post("/issues",json=self.payload(category="Electrical")).json()
+        unassigned=self.client.post("/issues",json=self.payload(title="Unassigned electrical socket",category="Electrical")).json()
         self.client.patch(f"/issues/{issue['id']}/assignment",headers={"Authorization":"Bearer "+admin_token},json={"staff_user_id":second["id"]})
         token=self.client.post("/issues/staff/login",json={"email":"one@campus.test","password":"secure-staff-password"}).json()["access_token"]
         denied=self.client.patch(f"/issues/{issue['id']}/status",headers={"Authorization":"Bearer "+token},json={"status":"In Progress"})
         self.assertEqual(denied.status_code,403)
         hidden=self.client.get("/issues/staff",headers={"Authorization":"Bearer "+token})
-        self.assertEqual([item["id"] for item in hidden.json()],[issue["id"]])
+        self.assertEqual([item["id"] for item in hidden.json()],[unassigned["id"]])
+        history_denied=self.client.get(f"/issues/{issue['id']}/history",headers={"Authorization":"Bearer "+token})
+        self.assertEqual(history_denied.status_code,403)
         plumber=self.add_staff(admin_token,"plumber@campus.test","Plumbing Maintenance")
+        wrong_department=self.client.patch(f"/issues/{issue['id']}/assignment",headers={"Authorization":"Bearer "+admin_token},json={"staff_user_id":plumber["id"]})
+        self.assertEqual(wrong_department.status_code,422)
         plumber_token=self.client.post("/issues/staff/login",json={"email":"plumber@campus.test","password":"secure-staff-password"}).json()["access_token"]
         cross=self.client.patch(f"/issues/{issue['id']}/status",headers={"Authorization":"Bearer "+plumber_token},json={"status":"Resolved"})
         self.assertEqual(cross.status_code,403)
+        plumber_tasks=self.client.get("/issues/staff",headers={"Authorization":"Bearer "+plumber_token})
+        self.assertEqual(plumber_tasks.json(),[])
     def test_only_admin_can_manage_staff_accounts(self):
         admin_token=self.admin()["access_token"];self.add_staff(admin_token)
         token=self.client.post("/issues/staff/login",json={"email":"tech@campus.test","password":"secure-staff-password"}).json()["access_token"]
