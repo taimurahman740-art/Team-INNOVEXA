@@ -124,7 +124,12 @@ def track_issue(tracking_code: str, db: Session = Depends(get_db)):
 
 
 def _department_scope(statement, user: StaffUser):
-    return statement if user.role == "admin" else statement.where(Issue.department == user.department)
+    if user.role == "admin":
+        return statement
+    return statement.where(
+        Issue.department == user.department,
+        (Issue.assigned_staff_id.is_(None)) | (Issue.assigned_staff_id == user.id),
+    )
 
 
 @router.get("/staff", response_model=list[IssueRead])
