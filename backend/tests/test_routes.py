@@ -114,7 +114,7 @@ class IssueApiTests(unittest.TestCase):
                     json={"image_data": image_data},
                 )
         self.assertEqual(response.status_code, 200)
-        classify.assert_called_once_with(b"\\x89PNG\\r\\n\\x1a\\n", "test-token", "custom/test-model")
+        classify.assert_called_once_with(bytes.fromhex("89504e470d0a1a0a"), "test-token", "custom/test-model")
 
     def test_image_provider_failure_returns_safe_fallback_message(self):
         secret = "hf-test-secret-must-not-leak"
