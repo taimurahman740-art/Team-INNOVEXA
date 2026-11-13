@@ -92,6 +92,45 @@ class IssueApiTests(unittest.TestCase):
         self.assertEqual(response.json()["category"], "Plumbing")
         self.assertEqual(response.json()["score"], 0.87)
 
+    def test_image_classification_rejects_invalid_image_before_provider_call(self):
+        with patch.dict(os.environ, {"HF_TOKEN": "test-token"}):
+            with patch("app.routes.classify_campus_image") as classify:
+                response = self.client.post(
+                    "/issues/image-classification",
+                    json={"image_data": "data:image/png;base64,not-a-real-png"},
+                )
+        self.assertEqual(response.status_code, 422)
+        classify.assert_not_called()
+
+    def test_image_classification_uses_configured_model(self):
+        image_data = "data:image/png;base64,iVBORw0KGgo="
+        with patch.dict(os.environ, {"HF_TOKEN": "test-token", "HF_IMAGE_MODEL": "custom/test-model"}):
+            with patch(
+                "app.routes.classify_campus_image",
+                return_value={"category": "Electrical", "score": 0.91, "model": "custom/test-model"},
+            ) as classify:
+                response = self.client.post(
+                    "/issues/image-classification",
+                    json={"image_data": image_data},
+                )
+        self.assertEqual(response.status_code, 200)
+        classify.assert_called_once_with(b"\\x89PNG\\r\\n\\x1a\\n", "test-token", "custom/test-model")
+
+    def test_image_provider_failure_returns_safe_fallback_message(self):
+        secret = "hf-test-secret-must-not-leak"
+        with patch.dict(os.environ, {"HF_TOKEN": secret}):
+            with patch(
+                "app.routes.classify_campus_image",
+                side_effect=RuntimeError(f"provider failed with token {secret}"),
+            ):
+                response = self.client.post(
+                    "/issues/image-classification",
+                    json={"image_data": "data:image/png;base64,iVBORw0KGgo="},
+                )
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("choose a category manually", response.json()["detail"])
+        self.assertNotIn(secret, response.text)
+
     def test_invalid_image_data_is_rejected(self):
         response = self.client.post(
             "/issues", json=self.create_payload(image_data="not-an-image")
