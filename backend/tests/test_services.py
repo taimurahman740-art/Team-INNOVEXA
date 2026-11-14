@@ -21,6 +21,19 @@ class TriageServiceTests(unittest.TestCase):
     def test_category_maps_to_department(self):
         self.assertEqual(suggest_department("Electrical"), "Electrical Maintenance")
 
+    def test_active_fire_in_electrical_room_routes_to_campus_safety(self):
+        title = "Fire detected in building"
+        description = "Flames and smoke are coming from the electrical room."
+        self.assertEqual(suggest_category(title, description), "Safety")
+        self.assertEqual(suggest_department(suggest_category(title, description)), "Campus Safety")
+
+    def test_fire_inspection_without_active_hazard_does_not_force_safety_override(self):
+        title = "Fire inspection"
+        description = "No fire or smoke was detected in the building."
+        score, level, _ = assess_safety_risk(title, description)
+        self.assertEqual((score, level), (0, "Low"))
+        # No active fire-emergency rule should be triggered by a negated report.
+
     def test_classifier_returns_valid_label_and_probability(self):
         label, confidence = classify_issue("Broken light", "Classroom lamp does not turn on")
         self.assertIn(label, {"Electrical", "Plumbing", "Cleaning", "Safety", "Facility", "Other"})
@@ -155,6 +168,17 @@ class TriageServiceTests(unittest.TestCase):
         self.assertEqual(level, "Moderate")
         self.assertEqual(score, 2)
         self.assertIn("Potential fall hazard", reasons)
+
+    def test_explicitly_denied_hazards_are_not_flagged(self):
+        examples = [
+            ("Fire inspection", "No fire or smoke was detected in the building."),
+            ("Gas inspection", "There is no gas leak in the kitchen."),
+            ("Electrical inspection", "No water is leaking near the power outlet."),
+        ]
+        for title, description in examples:
+            with self.subTest(title=title, description=description):
+                score, level, reasons = assess_safety_risk(title, description)
+                self.assertEqual((score, level, reasons), (0, "Low", []))
 
     def test_gas_bill_is_not_a_gas_leak(self):
         score, level, reasons = assess_safety_risk("Gas bill question", "I need help understanding my monthly gas bill")

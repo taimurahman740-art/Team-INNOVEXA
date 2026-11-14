@@ -99,6 +99,16 @@ def classify_issue(title: str, description: str) -> tuple[str, float]:
     return _classifier.predict(f"{title} {description}")
 
 def suggest_category(title: str, description: str) -> str:
+    # Route confirmed fire/smoke/gas emergency signals to Campus Safety even
+    # when the Naive Bayes model is distracted by a location such as "electrical room".
+    risk_score, _, risk_reasons = assess_safety_risk(title, description)
+    safety_emergency_reasons = {
+        "Possible fire, smoke, gas or explosion",
+        "Fire protection or emergency equipment unavailable",
+    }
+    if risk_score >= 5 and safety_emergency_reasons.intersection(risk_reasons):
+        return "Safety"
+
     category, confidence = classify_issue(title, description)
     return category if confidence >= 0.30 else "Other"
 
@@ -115,11 +125,25 @@ def suggest_priority(title: str, description: str) -> str:
         return "Medium"
     return "Low"
 
+def _is_negated_hazard(text: str, match_start: int) -> bool:
+    """Avoid triggering a hazard rule when its matched phrase is explicitly negated."""
+    preceding_text = text[max(0, match_start - 32):match_start]
+    direct_negation = re.search(
+        r"\b(?:no|not|never|without|free of|isn't|aren't|wasn't|weren't)\s+(?:any\s+)?$",
+        preceding_text,
+    )
+    coordinated_negation = re.search(
+        r"\bno\s+(?:fire|smoke|gas|water)(?:\s*,\s*(?:fire|smoke|gas|water))*\s+or\s+$|\bno\s+(?:fire|smoke|gas|water)\s+or\s+$",
+        preceding_text,
+    )
+    return direct_negation is not None or coordinated_negation is not None
+
+
 def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str]]:
     """Keyword triage aid only; not a validated safety prediction model."""
     text = f"{title} {description}".lower()
     rules = [
-        (r"\b(fire(?! (?:exit|extinguisher|alarm)\b)|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\b",
+        (r"\b(fire(?! (?:exit|extinguisher|alarm|inspection)\b)|flames|smoke|explosion|gas leak|gas is leaking|smell of gas|gas smell|rotten egg smell)\b",
          5, "Possible fire, smoke, gas or explosion"),
         (r"\b(?:"
          r"fire alarm (?:is )?(?:not working|broken|disabled|offline|out of service)|"
@@ -152,7 +176,8 @@ def assess_safety_risk(title: str, description: str) -> tuple[int, str, list[str
     score = 0
     reasons = []
     for pattern, points, reason in rules:
-        if re.search(pattern, text):
+        matches = re.finditer(pattern, text)
+        if any(not _is_negated_hazard(text, match.start()) for match in matches):
             score += points
             reasons.append(reason)
     score = min(score, 10)

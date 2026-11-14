@@ -17,7 +17,7 @@ from .schemas import (
     StaffUserRead, StaffTokenRead, StaffSetupStatus,
 )
 from .image_recognition import classify_campus_image
-from .services import assess_safety_risk, classify_issue, suggest_department, suggest_priority
+from .services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 IMAGE_PATTERN = re.compile(r"^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$")
@@ -196,9 +196,14 @@ def get_issue_history(issue_id: int, user: StaffUser = Depends(get_current_staff
 def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     if payload.image_data and not validate_image_data(payload.image_data):
         raise HTTPException(status_code=422, detail="Image must be PNG, JPEG or WEBP.")
-    category, confidence = classify_issue(payload.title, payload.description)
-    if payload.category != "Other": category = payload.category
-    elif confidence < 0.30: category = "Other"
+
+    _, confidence = classify_issue(payload.title, payload.description)
+    category = (
+        payload.category
+        if payload.category != "Other"
+        else suggest_category(payload.title, payload.description)
+    )
+
     risk_score, risk_level, risk_reasons = assess_safety_risk(payload.title, payload.description)
     suggested_priority = suggest_priority(payload.title, payload.description)
     final_priority = "High" if risk_score >= 5 else (payload.priority or suggested_priority)
