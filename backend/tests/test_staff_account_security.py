@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -33,8 +31,9 @@ def client_and_users(monkeypatch):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client, admin, staff, db
+    test_client = TestClient(app)
+    yield test_client, admin, staff, db
+    test_client.close()
     app.dependency_overrides.clear()
     db.close()
     Base.metadata.drop_all(bind=engine)
