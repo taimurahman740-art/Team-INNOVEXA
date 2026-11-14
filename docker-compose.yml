@@ -1,0 +1,53 @@
+name: innovexa
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: innovexa
+      POSTGRES_USER: innovexa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-innovexa-local-only}
+      TZ: Asia/Seoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - innovexa-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U innovexa -d innovexa"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://innovexa:${POSTGRES_PASSWORD:-innovexa-local-only}@db:5432/innovexa
+      FRONTEND_ORIGINS: http://localhost,http://localhost:8080,http://127.0.0.1:8080
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  innovexa-postgres:
