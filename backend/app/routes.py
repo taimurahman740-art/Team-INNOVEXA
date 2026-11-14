@@ -11,6 +11,7 @@ from .models import Issue, IssueStatusHistory
 from .schemas import IssueCreate, ImageClassificationRequest, IssueRead, IssuePublicRead, IssueStatusUpdate, IssueStatusHistoryRead
 from .image_recognition import classify_campus_image
 from .services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
+from .routing import apply_safety_category_override
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 IMAGE_PATTERN = re.compile(r"^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$")
@@ -66,6 +67,9 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     elif confidence < 0.30:
         category = "Other"
     risk_score, risk_level, risk_reasons = assess_safety_risk(payload.title, payload.description)
+    # Active fire, smoke, gas, or explosion hazards must be handled by Campus Safety,
+    # even when the text classifier's best category is Electrical.
+    category = apply_safety_category_override(category, risk_reasons)
     # A submitted priority may customize routine reports, but it must never
     # downgrade a report that the safety rules have flagged as High risk.
     suggested_priority = suggest_priority(payload.title, payload.description)
