@@ -144,5 +144,4 @@ class IssueApiTests(unittest.TestCase):
         self.assertIn("choose a category manually", response.json()["detail"])
         self.assertNotIn(secret, response.text)
 
-
 if __name__=="__main__": unittest.main()
