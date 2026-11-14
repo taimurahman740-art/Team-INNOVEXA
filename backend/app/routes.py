@@ -60,11 +60,12 @@ def list_staff_issues(db: Session = Depends(get_db)):
 def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     if payload.image_data and not validate_image_data(payload.image_data):
         raise HTTPException(status_code=422, detail="Image must be PNG, JPEG or WEBP.")
-    category, confidence = classify_issue(payload.title, payload.description)
-    if payload.category != "Other":
-        category = payload.category
-    elif confidence < 0.30:
-        category = "Other"
+    _, confidence = classify_issue(payload.title, payload.description)
+    category = (
+        payload.category
+        if payload.category != "Other"
+        else suggest_category(payload.title, payload.description)
+    )
     risk_score, risk_level, risk_reasons = assess_safety_risk(payload.title, payload.description)
     # A submitted priority may customize routine reports, but it must never
     # downgrade a report that the safety rules have flagged as High risk.

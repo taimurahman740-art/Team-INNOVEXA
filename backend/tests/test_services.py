@@ -21,6 +21,19 @@ class TriageServiceTests(unittest.TestCase):
     def test_category_maps_to_department(self):
         self.assertEqual(suggest_department("Electrical"), "Electrical Maintenance")
 
+    def test_active_fire_in_electrical_room_routes_to_campus_safety(self):
+        title = "Fire detected in building"
+        description = "Flames and smoke are coming from the electrical room."
+        self.assertEqual(suggest_category(title, description), "Safety")
+        self.assertEqual(suggest_department(suggest_category(title, description)), "Campus Safety")
+
+    def test_fire_inspection_without_active_hazard_does_not_force_safety_override(self):
+        title = "Fire inspection"
+        description = "No fire or smoke was detected in the building."
+        score, level, _ = assess_safety_risk(title, description)
+        self.assertEqual((score, level), (0, "Low"))
+        # No active fire-emergency rule should be triggered by a negated report.
+
     def test_classifier_returns_valid_label_and_probability(self):
         label, confidence = classify_issue("Broken light", "Classroom lamp does not turn on")
         self.assertIn(label, {"Electrical", "Plumbing", "Cleaning", "Safety", "Facility", "Other"})
