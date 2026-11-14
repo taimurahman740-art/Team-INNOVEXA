@@ -26,3 +26,7 @@ export const createStaffUser = (account,token) => request("/issues/staff/users",
 export const patchStatus = (id,status,token) => request(`/issues/${id}/status`,{method:"PATCH",token,body:JSON.stringify({status})});
 export const assignIssue = (id,staff_user_id,token) => request(`/issues/${id}/assignment`,{method:"PATCH",token,body:JSON.stringify({staff_user_id})});
 export const getIssueHistory = (id,token) => request(`/issues/${id}/history`,{token});
+
+export const changeStaffPassword = (current_password,new_password,token) => request("/issues/staff/me/password",{method:"PATCH",token,body:JSON.stringify({current_password,new_password})});
+export const setStaffActive = (id,is_active,token) => request(`/issues/staff/users/${id}/active`,{method:"PATCH",token,body:JSON.stringify({is_active})});
+export const resetStaffPassword = (id,new_password,token) => request(`/issues/staff/users/${id}/reset-password`,{method:"POST",token,body:JSON.stringify({new_password})});

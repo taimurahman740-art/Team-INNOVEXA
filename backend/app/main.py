@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import Base, engine
 from . import models
 from .routes import router
+from .account_routes import router as account_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +31,7 @@ app = FastAPI(title="INNOVEXA Smart Campus API", version="0.3.0", lifespan=lifes
 origins = [x.strip() for x in os.getenv("FRONTEND_ORIGINS", "*").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False, allow_methods=["GET","POST","PATCH","OPTIONS"], allow_headers=["Content-Type","Authorization"])
 app.include_router(router)
+app.include_router(account_router)
 
 @app.get("/")
 def root(): return {"message":"INNOVEXA Smart Campus API","docs":"/docs"}

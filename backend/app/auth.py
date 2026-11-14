@@ -36,18 +36,19 @@ def verify_password(password: str, encoded: str) -> bool:
     except (ValueError, TypeError): return False
 
 def create_access_token(user: StaffUser) -> str:
-    payload = _enc(json.dumps({"sub": user.id, "exp": int(time.time()) + TOKEN_LIFETIME_SECONDS}, separators=(",", ":")).encode())
+    password_fingerprint = hashlib.sha256(user.password_hash.encode()).hexdigest()
+    payload = _enc(json.dumps({"sub": user.id, "exp": int(time.time()) + TOKEN_LIFETIME_SECONDS, "pwd": password_fingerprint}, separators=(",", ":")).encode())
     signature = hmac.new(_secret(), payload.encode(), hashlib.sha256).digest()
     return payload + "." + _enc(signature)
 
-def decode_access_token(token: str) -> int:
+def decode_access_token(token: str) -> tuple[int, str]:
     try:
         payload, signature = token.split(".", 1)
         expected = hmac.new(_secret(), payload.encode(), hashlib.sha256).digest()
         if not hmac.compare_digest(expected, _dec(signature)): raise ValueError("signature")
         data = json.loads(_dec(payload))
         if int(data["exp"]) <= int(time.time()): raise ValueError("expired")
-        return int(data["sub"])
+        return int(data["sub"]), str(data["pwd"])
     except HTTPException: raise
     except (ValueError, TypeError, KeyError, json.JSONDecodeError):
         raise HTTPException(status_code=401, detail="Staff session is invalid or expired. Please sign in again.")
@@ -55,8 +56,10 @@ def decode_access_token(token: str) -> int:
 def get_current_staff(credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme), db: Session = Depends(get_db)) -> StaffUser:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Sign in with your staff email and password.")
-    user = db.get(StaffUser, decode_access_token(credentials.credentials))
-    if user is None or not user.is_active: raise HTTPException(status_code=401, detail="This staff account is unavailable.")
+    user_id, password_fingerprint = decode_access_token(credentials.credentials)
+    user = db.get(StaffUser, user_id)
+    current_fingerprint = hashlib.sha256(user.password_hash.encode()).hexdigest() if user is not None else ""
+    if user is None or not user.is_active or not hmac.compare_digest(password_fingerprint, current_fingerprint): raise HTTPException(status_code=401, detail="This staff account is unavailable.")
     return user
 
 def require_admin(user: StaffUser = Depends(get_current_staff)) -> StaffUser:

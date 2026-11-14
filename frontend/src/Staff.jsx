@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from "react";
 import {LockKeyhole,LogOut,ShieldCheck,UserPlus,Wrench,MapPin} from "lucide-react";
-import {assignIssue,bootstrapStaffAdmin,createStaffUser,getIssueHistory,getStaffIssues,getStaffSetupStatus,getStaffUsers,loginStaff} from "./api.js";
+import {assignIssue,bootstrapStaffAdmin,createStaffUser,getIssueHistory,getStaffIssues,getStaffSetupStatus,getStaffUsers,loginStaff,changeStaffPassword,setStaffActive,resetStaffPassword} from "./api.js";
 
 const departments=["Electrical Maintenance","Plumbing Maintenance","Cleaning Services","Campus Safety","Facilities Maintenance","Campus Administration"];
 const rank={high:0,medium:1,low:2};
@@ -13,6 +13,7 @@ export default function Staff({issues,live,onUpdate}) {
   const [error,setError]=useState(""),[success,setSuccess]=useState(""),[busy,setBusy]=useState(false),[view,setView]=useState("open"),[dept,setDept]=useState("All");
   const [history,setHistory]=useState({}),[historyLoading,setHistoryLoading]=useState(null);
   const [newStaff,setNewStaff]=useState({full_name:"",email:"",password:"",department:"Facilities Maintenance",role:"staff"});
+  const [currentPassword,setCurrentPassword]=useState(""),[nextPassword,setNextPassword]=useState("");
 
   useEffect(()=>{getStaffSetupStatus().then(r=>{setSetupAvailable(r.setup_available);setBootstrapMode(r.setup_available);}).catch(()=>setError("Could not check staff account setup.")).finally(()=>setAuthReady(true));},[]);
 
@@ -45,6 +46,23 @@ export default function Staff({issues,live,onUpdate}) {
     event.preventDefault();setBusy(true);setError("");setSuccess("");
     try{await createStaffUser(newStaff,token);setStaffUsers(await getStaffUsers(token));setNewStaff({full_name:"",email:"",password:"",department:"Facilities Maintenance",role:"staff"});setSuccess("Staff account created.");}
     catch(err){setError(err.message||"Could not create account.");}
+    finally{setBusy(false);}
+  }
+  async function updateAccountActive(member){
+    try{await setStaffActive(member.id,!member.is_active,token);setStaffUsers(await getStaffUsers(token));setSuccess(`Account ${member.is_active?"deactivated":"activated"}.`);setError("");}
+    catch(err){setError(err.message||"Could not update account.");}
+  }
+  async function adminResetPassword(member){
+    const value=window.prompt(`Enter a new password (at least 12 characters) for ${member.full_name}:`);
+    if(value===null)return;
+    if(value.length<12){setError("Password must be at least 12 characters.");return;}
+    try{await resetStaffPassword(member.id,value,token);setSuccess(`Password reset for ${member.full_name}.`);setError("");}
+    catch(err){setError(err.message||"Could not reset password.");}
+  }
+  async function updateOwnPassword(event){
+    event.preventDefault();setBusy(true);setError("");setSuccess("");
+    try{await changeStaffPassword(currentPassword,nextPassword,token);setCurrentPassword("");setNextPassword("");setSuccess("Your password has been changed.");}
+    catch(err){setError(err.message||"Could not change password.");}
     finally{setBusy(false);}
   }
   async function assign(id,value){
@@ -86,8 +104,9 @@ export default function Staff({issues,live,onUpdate}) {
           <button className="btn btn-primary" disabled={busy}>Create account</button>
         </form>
       </div>
-      <div className="staff-admin-panel"><h3>Staff directory</h3>{staffUsers.map(m=><div className="staff-directory-row" key={m.id}><strong>{m.full_name}</strong><span>{m.department} · {m.role} · {m.email}</span></div>)}</div>
+      <div className="staff-admin-panel"><h3>Staff directory</h3>{staffUsers.map(m=><div className="staff-directory-row" key={m.id}><strong>{m.full_name}</strong><span>{m.department} · {m.role} · {m.email} · {m.is_active?"Active":"Inactive"}</span><button className="btn btn-light" onClick={()=>updateAccountActive(m)} disabled={m.id===user.id}>{m.is_active?"Deactivate":"Activate"}</button><button className="btn btn-light" onClick={()=>adminResetPassword(m)}>Reset password</button></div>)}</div>
     </>}
+    <div className="staff-admin-panel"><h3>Change your password</h3><form className="form staff-admin-form" onSubmit={updateOwnPassword}><label>Current password<input type="password" required value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} autoComplete="current-password"/></label><label>New password (minimum 12 characters)<input type="password" required minLength="12" value={nextPassword} onChange={e=>setNextPassword(e.target.value)} autoComplete="new-password"/></label><button className="btn btn-primary" disabled={busy}>Update password</button></form></div>
     <div className="toolbar"><span>{tasks.length} {view==="resolved"?"resolved reports":view==="all"?"reports":"open tasks"}</span><div className="staff-toolbar-controls">
       {user.role==="admin"&&<select className="status-select" value={dept} onChange={e=>setDept(e.target.value)}><option>All</option>{departments.map(d=><option key={d}>{d}</option>)}</select>}
       <button className="btn btn-light" onClick={()=>setView("open")}>Open</button><button className="btn btn-light" onClick={()=>setView("resolved")}>Resolved</button><button className="btn btn-light" onClick={()=>setView("all")}>All</button>

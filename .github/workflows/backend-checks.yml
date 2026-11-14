@@ -26,9 +26,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install backend dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
       - name: Run regression tests
-        run: python -m unittest discover -s tests
+        run: python -m pytest -q
       - name: Run classifier holdout evaluation
         run: python -m app.evaluate_classifier
 
