@@ -5,7 +5,7 @@ import {cleanup, render, screen} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App.jsx";
 import * as api from "./api.js";
-vi.mock("./api.js", () => ({getIssues: vi.fn(), postIssue: vi.fn(), patchStatus: vi.fn(), verifyStaffKey: vi.fn(), getIssueHistory: vi.fn()}));
+vi.mock("./api.js", () => ({getIssues: vi.fn(), postIssue: vi.fn(), patchStatus: vi.fn(), getStaffSetupStatus: vi.fn(), loginStaff: vi.fn(), bootstrapStaffAdmin: vi.fn(), getStaffIssues: vi.fn(), getStaffUsers: vi.fn(), createStaffUser: vi.fn(), assignIssue: vi.fn(), getIssueHistory: vi.fn(), getIssueTracking: vi.fn(), classifyImage: vi.fn()}));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const records = [
  {id:1,title:"Broken classroom light",description:"Light is not working",category:"Electrical",priority:"Medium",status:"Submitted",location:"Room 101",department:"Electrical Maintenance",created_at:"2026-01-01T00:00:00Z"},
