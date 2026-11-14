@@ -36,18 +36,18 @@ def verify_password(password: str, encoded: str) -> bool:
     except (ValueError, TypeError): return False
 
 def create_access_token(user: StaffUser) -> str:
-    payload = _enc(json.dumps({"sub": user.id, "exp": int(time.time()) + TOKEN_LIFETIME_SECONDS}, separators=(",", ":")).encode())
+    password_fingerprint = hashlib.sha256(user.password_hash.encode()).hexdigest()\n    payload = _enc(json.dumps({"sub": user.id, "exp": int(time.time()) + TOKEN_LIFETIME_SECONDS, "pwd": password_fingerprint}, separators=(",", ":")).encode())
     signature = hmac.new(_secret(), payload.encode(), hashlib.sha256).digest()
     return payload + "." + _enc(signature)
 
-def decode_access_token(token: str) -> int:
+def decode_access_token(token: str) -> tuple[int, str]:
     try:
         payload, signature = token.split(".", 1)
         expected = hmac.new(_secret(), payload.encode(), hashlib.sha256).digest()
         if not hmac.compare_digest(expected, _dec(signature)): raise ValueError("signature")
         data = json.loads(_dec(payload))
         if int(data["exp"]) <= int(time.time()): raise ValueError("expired")
-        return int(data["sub"])
+        return int(data["sub"]), str(data["pwd"])
     except HTTPException: raise
     except (ValueError, TypeError, KeyError, json.JSONDecodeError):
         raise HTTPException(status_code=401, detail="Staff session is invalid or expired. Please sign in again.")
