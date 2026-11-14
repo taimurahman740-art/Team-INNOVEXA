@@ -99,6 +99,16 @@ def classify_issue(title: str, description: str) -> tuple[str, float]:
     return _classifier.predict(f"{title} {description}")
 
 def suggest_category(title: str, description: str) -> str:
+    # Route confirmed fire/smoke/gas emergency signals to Campus Safety even
+    # when the Naive Bayes model is distracted by a location such as "electrical room".
+    risk_score, _, risk_reasons = assess_safety_risk(title, description)
+    safety_emergency_reasons = {
+        "Possible fire, smoke, gas or explosion",
+        "Fire protection or emergency equipment unavailable",
+    }
+    if risk_score >= 5 and safety_emergency_reasons.intersection(risk_reasons):
+        return "Safety"
+
     category, confidence = classify_issue(title, description)
     return category if confidence >= 0.30 else "Other"
 
