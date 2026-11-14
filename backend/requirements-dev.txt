@@ -1,1 +1,2 @@
--r requirements.txt\npytest>=8,<10\n
+-r requirements.txt
+pytest>=8,<10
