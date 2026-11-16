@@ -1,4 +1,4 @@
-"""Readiness endpoint tests; the database engine is mocked, never production data."""
+"""Readiness endpoint and startup identifier tests."""
 import unittest
 from unittest.mock import patch
 
@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import main
+from app.models import generate_tracking_code
 
 
 class HealthEndpointTests(unittest.TestCase):
@@ -27,6 +28,12 @@ class HealthEndpointTests(unittest.TestCase):
             response = self.client.get("/health")
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["detail"], "Database unavailable")
+
+    def test_generated_tracking_codes_fit_database_column(self):
+        for _ in range(100):
+            code = generate_tracking_code()
+            self.assertTrue(code.startswith("INX-"))
+            self.assertEqual(len(code), 32)
 
 
 if __name__ == "__main__":
