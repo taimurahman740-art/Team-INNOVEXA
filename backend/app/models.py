@@ -4,6 +4,12 @@ from sqlalchemy import DateTime, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
+
+def generate_tracking_code() -> str:
+    """Generate an INNOVEXA tracking code that fits VARCHAR(32)."""
+    return "INX-" + secrets.token_hex(14).upper()
+
+
 class StaffUser(Base):
     __tablename__ = "staff_users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -14,6 +20,7 @@ class StaffUser(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="staff")
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
 
 class Issue(Base):
     __tablename__ = "issues"
@@ -31,8 +38,9 @@ class Issue(Base):
     risk_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default="Low")
     risk_reasons: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
-    tracking_code: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True, default=lambda: "INX-" + secrets.token_hex(16).upper())
+    tracking_code: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True, default=generate_tracking_code)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
 
 class IssueStatusHistory(Base):
     __tablename__ = "issue_status_history"
