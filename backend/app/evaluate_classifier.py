@@ -8,14 +8,14 @@ independent campus observations.
 import csv
 from collections import defaultdict
 from pathlib import Path
-from .services import classify_issue
+from .services import suggest_category
 
 DATASET = Path(__file__).resolve().parents[1] / "data" / "tongmyong_sample_issues.csv"
 
 
 def predict_category(title: str, description: str) -> str:
-    label, confidence = classify_issue(title, description)
-    return label if confidence >= 0.30 else "Other"
+    # Same path as production, including the fire/smoke safety override and the confidence cutoff.
+    return suggest_category(title, description)
 
 
 def main():
