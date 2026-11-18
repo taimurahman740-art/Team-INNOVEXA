@@ -1,18 +1,17 @@
-FROM node:20-alpine AS build
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-ARG VITE_API_BASE_URL=http://localhost:8000
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN npm run build
+COPY app ./app
+# services.py loads data/tongmyong_sample_issues.csv at import time
+COPY data ./data
 
-FROM nginx:1.27-alpine
+EXPOSE 8000
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
-
-EXPOSE 80
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
