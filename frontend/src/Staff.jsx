@@ -32,7 +32,7 @@ export default function Staff({issues,live,onUpdate}) {
     } catch(err) {setError(err.message||"Staff sign-in failed.");}
     finally {setBusy(false);}
   }
-  function signOut(){setToken("");setUser(null);setPassword("");setStaffUsers([]);setStaffIssues(issues);setHistory({});setSuccess("");setError("");}
+  function signOut(notice=""){setToken("");setUser(null);setEmail("");setPassword("");setBootstrapKey("");setFullName("");setCurrentPassword("");setNextPassword("");setStaffUsers([]);setStaffIssues(issues);setHistory({});setSetupAvailable(false);setBootstrapMode(false);setError("");setSuccess(notice);}
   async function refresh(){try{setStaffIssues(await getStaffIssues(token));setError("");}catch(err){setError(err.message||"Could not refresh tasks.");}}
   async function changeStatus(id,status){try{const item=await onUpdate(id,status,token);setStaffIssues(old=>old.map(x=>x.id===id?item:x));setSuccess(`Report #${id} updated to ${status}.`);setError("");}catch(err){setError(err.message||"Could not update report.");}}
   async function toggleHistory(id){
@@ -56,12 +56,12 @@ export default function Staff({issues,live,onUpdate}) {
     const value=window.prompt(`Enter a new password (at least 12 characters) for ${member.full_name}:`);
     if(value===null)return;
     if(value.length<12){setError("Password must be at least 12 characters.");return;}
-    try{await resetStaffPassword(member.id,value,token);setSuccess(`Password reset for ${member.full_name}.`);setError("");}
+    try{await resetStaffPassword(member.id,value,token);if(member.id===user.id){signOut("Your password was reset. Please sign in again.");return;}setSuccess(`Password reset for ${member.full_name}.`);setError("");}
     catch(err){setError(err.message||"Could not reset password.");}
   }
   async function updateOwnPassword(event){
     event.preventDefault();setBusy(true);setError("");setSuccess("");
-    try{await changeStaffPassword(currentPassword,nextPassword,token);setCurrentPassword("");setNextPassword("");setSuccess("Your password has been changed.");}
+    try{await changeStaffPassword(currentPassword,nextPassword,token);signOut("Your password was changed. Please sign in again.");return;}
     catch(err){setError(err.message||"Could not change password.");}
     finally{setBusy(false);}
   }
@@ -85,12 +85,13 @@ export default function Staff({issues,live,onUpdate}) {
       <button className="btn btn-primary" disabled={busy}><LockKeyhole size={14}/>{busy?"Please wait…":bootstrapMode?"Create administrator":"Sign in"}</button>
     </form>
     {error&&<p className="staff-error" role="alert">{error}</p>}
+    {success&&<p className="staff-success" role="status">{success}</p>}
     {!bootstrapMode&&<p className="staff-hint">The previous shared staff key is no longer accepted. Ask your administrator for an individual account.</p>}
     {setupAvailable&&!bootstrapMode&&<button className="btn btn-light" onClick={()=>setBootstrapMode(true)}>Initial administrator setup</button>}
   </section>;
 
   return <section className="reports">
-    <div className="reports-head"><div><h2>Staff task centre</h2><p>{user.role==="admin"?"Administrator · all departments":user.department+" · department tasks"}</p></div><button className="btn btn-light" onClick={signOut}><LogOut size={14}/>Sign out</button></div>
+    <div className="reports-head"><div><h2>Staff task centre</h2><p>{user.role==="admin"?"Administrator · all departments":user.department+" · department tasks"}</p></div><button className="btn btn-light" onClick={()=>signOut()}><LogOut size={14}/>Sign out</button></div>
     <div className="staff-profile"><strong>{user.full_name}</strong><span>{user.email} · {user.role}</span><button className="btn btn-light" onClick={refresh}>Refresh tasks</button></div>
     {error&&<p className="staff-error" role="alert">{error}</p>}{success&&<p className="staff-success" role="status">{success}</p>}
     {user.role==="admin"&&<>
