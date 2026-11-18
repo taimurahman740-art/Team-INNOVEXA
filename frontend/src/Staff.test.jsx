@@ -10,6 +10,7 @@ vi.mock("./api.js",()=>({
   getStaffSetupStatus:vi.fn(),loginStaff:vi.fn(),bootstrapStaffAdmin:vi.fn(),
   getStaffIssues:vi.fn(),getStaffUsers:vi.fn(),createStaffUser:vi.fn(),
   assignIssue:vi.fn(),getIssueHistory:vi.fn(),
+  changeStaffPassword:vi.fn(),setStaffActive:vi.fn(),resetStaffPassword:vi.fn(),
 }));
 afterEach(()=>{cleanup();vi.clearAllMocks();});
 
@@ -66,5 +67,24 @@ describe("individual staff task centre",()=>{
     await user.type(screen.getByLabelText("Password"),"secure-admin-password");
     await user.click(screen.getByRole("button",{name:"Create administrator"}));
     expect(api.bootstrapStaffAdmin).toHaveBeenCalledWith(expect.objectContaining({bootstrap_key:"bootstrap-key",email:"admin@campus.test"}));
+  });
+
+  it("signs the user out after changing their own password",async()=>{
+    const user=userEvent.setup();
+    api.getStaffSetupStatus.mockResolvedValue({setup_available:false});
+    api.loginStaff.mockResolvedValue(session(staffUser));
+    api.getStaffIssues.mockResolvedValue([issue]);
+    api.changeStaffPassword.mockResolvedValue({message:"ok"});
+    render(<Staff issues={[issue]} live onUpdate={vi.fn()}/>);
+    await user.type(await screen.findByLabelText("Email"),"tech@campus.test");
+    await user.type(screen.getByLabelText("Password"),"secure-staff-password");
+    await user.click(screen.getByRole("button",{name:"Sign in"}));
+    await screen.findByText("Campus Technician");
+    await user.type(screen.getByLabelText("Current password"),"secure-staff-password");
+    await user.type(screen.getByLabelText("New password (minimum 12 characters)"),"another-secure-password");
+    await user.click(screen.getByRole("button",{name:"Update password"}));
+    expect(api.changeStaffPassword).toHaveBeenCalledWith("secure-staff-password","another-secure-password","test-session-token");
+    expect(await screen.findByText("Your password was changed. Please sign in again.")).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"Sign in"})).toBeInTheDocument();
   });
 });
