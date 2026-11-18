@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from "vitest";
-import {getIssues,postIssue,getStaffIssues,patchStatus,getIssueHistory} from "./api.js";
+import {getIssues,postIssue,getStaffIssues,patchStatus,getIssueHistory,changeStaffPassword} from "./api.js";
 afterEach(()=>vi.unstubAllGlobals());
 function mockResponse(body,ok=true,status=200){return{ok,status,json:async()=>body,text:async()=>typeof body==="string"?body:JSON.stringify(body)};}
 describe("API client",()=>{
@@ -30,5 +30,22 @@ describe("API client",()=>{
   it("surfaces API validation details",async()=>{
     vi.stubGlobal("fetch",vi.fn().mockResolvedValue(mockResponse({detail:"Unsupported image"},false,422)));
     await expect(postIssue({})).rejects.toThrow("Unsupported image");
+  });
+  it("turns FastAPI validation error lists into readable text",async()=>{
+    const detail=[{loc:["body","password"],msg:"String should have at least 12 characters"},{loc:["body","email"],msg:"Field required"}];
+    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(mockResponse({detail},false,422)));
+    await expect(changeStaffPassword("a","b","tok")).rejects.toThrow("String should have at least 12 characters; Field required");
+  });
+  it("falls back to the raw text for non-JSON errors",async()=>{
+    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(mockResponse("Bad gateway",false,502)));
+    await expect(getIssues()).rejects.toThrow("Bad gateway");
+  });
+  it("only sends Content-Type when there is a request body",async()=>{
+    const fetchMock=vi.fn().mockResolvedValue(mockResponse([]));
+    vi.stubGlobal("fetch",fetchMock);
+    await getIssues();
+    expect(fetchMock.mock.calls[0][1].headers["Content-Type"]).toBeUndefined();
+    await postIssue({title:"x"});
+    expect(fetchMock.mock.calls[1][1].headers["Content-Type"]).toBe("application/json");
   });
 });
