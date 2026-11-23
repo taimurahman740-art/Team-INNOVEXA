@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useState} from "react";
 import {LockKeyhole,LogOut,ShieldCheck,UserPlus,Wrench,MapPin} from "lucide-react";
+import AdminInsights from "./AdminInsights.jsx";
 import {assignIssue,bootstrapStaffAdmin,createStaffUser,getIssueHistory,getStaffIssues,getStaffSetupStatus,getStaffUsers,loginStaff,changeStaffPassword,setStaffActive,resetStaffPassword} from "./api.js";
 
 const departments=["Electrical Maintenance","Plumbing Maintenance","Cleaning Services","Campus Safety","Facilities Maintenance","Campus Administration"];
