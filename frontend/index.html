@@ -11,7 +11,15 @@
     <title>INNOVEXA | Smart Campus</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+  <div id="app-loading" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff;font-family:Arial,sans-serif;color:#123B66;">
+    <img src="/pwa-192x192.png" alt="INNOVEXA" width="100" height="100" style="object-fit:contain;margin-bottom:20px;" />
+    <h2 style="margin:0;font-size:25px;font-weight:700;">INNOVEXA</h2>
+    <p style="margin-top:9px;font-size:13px;color:#64748b;">Smart Campus Facility and Issue Management System</p>
+    <div style="width:34px;height:34px;border:3px solid #dce6f0;border-top-color:#123B66;border-radius:50%;animation:innovexa-spin .8s linear infinite;margin-top:20px;"></div>
+    <style>@keyframes innovexa-spin{to{transform:rotate(360deg)}}</style>
+  </div>
+</div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
