@@ -8,6 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
+        id: "/",
         name: "INNOVEXA Smart Campus",
         short_name: "INNOVEXA",
         description: "Smart Campus Facility and Issue Management System",
