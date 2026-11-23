@@ -13,6 +13,54 @@ const empty = {title:"",description:"",category:"Other",location:"",image_data:n
 function Stat({label,value,note,Icon}) { return <article className="stat"><div className="stat-label">{label}<Icon size={18}/></div><div className="stat-value">{value}</div><div className="stat-note">{note}</div></article>; }
 
 export default function App() {
+     const [isOnline, setIsOnline] = useState(navigator.onLine);
+     const [connectionMessage, setConnectionMessage] = useState("");
+
+
+ useEffect(() => {
+  let active = true;
+  let wasOnline = navigator.onLine;
+
+  const checkConnection = async () => {
+   try {
+    const response = await fetch(
+     "https://www.google.com/generate_204",
+     { method: "GET", mode: "no-cors", cache: "no-store" }
+    );
+
+    if (active) {
+     setIsOnline(true);
+     if (!wasOnline) {
+      setConnectionMessage("Internet connection restored.");
+     }
+     wasOnline = true;
+    }
+   } catch {
+    if (active) {
+     setIsOnline(false);
+     setConnectionMessage("You are offline. Check your internet connection.");
+     wasOnline = false;
+    }
+   }
+  };
+
+  const handleOnline = () => checkConnection();
+  const handleOffline = () => checkConnection();
+
+  window.addEventListener("online", handleOnline);
+  window.addEventListener("offline", handleOffline);
+
+  checkConnection();
+  const interval = setInterval(checkConnection, 10000);
+
+  return () => {
+   active = false;
+   clearInterval(interval);
+   window.removeEventListener("online", handleOnline);
+   window.removeEventListener("offline", handleOffline);
+  };
+ }, []);
+
  const [issues,setIssues]=useState(demo),[live,setLive]=useState(false),[notice,setNotice]=useState("Demo mode: connect the backend to save reports."),[query,setQuery]=useState(""),[modal,setModal]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[form,setForm]=useState(empty),[view,setView]=useState("overview"),[imageAnalysis,setImageAnalysis]=useState({status:"idle",message:""}),[mobileNavOpen,setMobileNavOpen]=useState(false),[lastTrackingCode,setLastTrackingCode]=useState("");
  const refresh=useCallback(async()=>{try{setIssues(await getIssues());setLive(true);setNotice("Connected: reports are loaded from the database.");setError("");}catch{setLive(false);setNotice("Backend unavailable. Demo records are shown; submissions will not be saved.");}},[]);
  useEffect(()=>{refresh();},[refresh]);
@@ -26,6 +74,7 @@ export default function App() {
   <aside className="sidebar"><div className="brand"><div className="brand-icon"><Activity size={22}/></div><div><strong>INNOVEXA</strong><span>SMART CAMPUS</span></div></div><button className="mobile-menu-toggle" type="button" aria-expanded={mobileNavOpen} aria-controls="mobile-workspace-nav" onClick={()=>setMobileNavOpen(open=>!open)}><Menu size={18}/><span>Menu</span></button><nav className={`side-nav ${mobileNavOpen?"open":""}`} id="mobile-workspace-nav" aria-label="Workspace navigation"><div className="side-label">WORKSPACE</div><button className={`side-link ${view==="overview"?"selected":""}`} onClick={()=>{setView("overview");setMobileNavOpen(false);}}><ClipboardList size={18}/>Issue overview</button><button className={`side-link ${view==="staff"?"selected":""}`} onClick={()=>{setView("staff");setMobileNavOpen(false);}}><Wrench size={18}/>Staff tasks</button><button className={`side-link ${view==="tracking"?"selected":""}`} onClick={()=>{setView("tracking");setMobileNavOpen(false);}}><Search size={18}/>Track a report</button><button className="side-link" onClick={()=>{setModal(true);setMobileNavOpen(false);}}><Plus size={18}/>Report an issue</button></nav><div className="side-bottom"><div className="safety"><ShieldCheck size={20}/><strong>Campus care</strong><p>For immediate danger, contact campus security or emergency services directly. This prototype is not an emergency-response system.</p></div><div className="team-chip"><div className="team-avatar">IX</div><div><b>Project preview</b><span>Team INNOVEXA</span></div></div></div></aside>
   <main className="main"><header className="header"><div><div className="eyebrow">CAMPUS OPERATIONS</div><h1>Issue overview</h1></div><div className="header-actions"><span className={`connection ${live?"connected":""}`}><i/>{live?"Backend connected":"Demo mode"}</span><button className="btn btn-primary" onClick={()=>setModal(true)}><Plus size={16}/>Report issue</button></div></header>
    <section className="hero"><div><div className="hero-kicker"><Sparkles size={14}/>SMART CAMPUS FACILITY MANAGEMENT</div><h2>A better campus starts with a report.</h2><p>Submit facility issues, track progress, and keep campus operations organized.</p></div><div className="hero-art"><Activity size={40}/></div></section>
+   {connectionMessage&&<div className={`notice ${isOnline?"notice-ok":""}`} role={isOnline?"status":"alert"}>{connectionMessage}</div>}
    <div className={`notice ${live?"notice-ok":""}`} role="status">{notice}</div>{lastTrackingCode&&<div className="tracking-confirmation"><div><strong>Your report tracking code</strong><span>Save this code to check progress later.</span></div><code>{lastTrackingCode}</code><button className="btn btn-light" onClick={()=>{navigator.clipboard?.writeText(lastTrackingCode);}}>Copy code</button><button className="btn btn-light" onClick={()=>setView("tracking")}>Track report</button></div>}{error&&<div className="error-banner" role="alert">{error}<button onClick={()=>setError("")} aria-label="Dismiss"><X size={15}/></button></div>}
    {view==="staff"?<Staff issues={issues} live={live} onUpdate={update}/>:view==="tracking"?<TrackIssue initialCode={lastTrackingCode}/>:<><section className="stats"><Stat label="Total reports" value={issues.length} note="All visible records" Icon={ClipboardList}/><Stat label="Open issues" value={open} note="Awaiting resolution" Icon={AlertTriangle}/><Stat label="High priority" value={high} note="Requires attention" Icon={Activity}/><Stat label="Resolved" value={resolved} note="Completed reports" Icon={CheckCircle2}/></section>
    <section className="reports"><div className="reports-head"><div><h2>Campus reports</h2><p>Search, review, and update issue status.</p></div><button className="btn btn-light" onClick={refresh}><RefreshCw size={15}/>Refresh</button></div><div className="toolbar"><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search reports, categories, locations…" aria-label="Search reports"/></div><span>{filtered.length} reports</span></div>
