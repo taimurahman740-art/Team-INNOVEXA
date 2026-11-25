@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import secrets
-from sqlalchemy import DateTime, Integer, String, Text, JSON
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -55,3 +55,30 @@ class IssueStatusHistory(Base):
     new_status: Mapped[str] = mapped_column(String(30), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     changed_by: Mapped[str] = mapped_column(String(80), nullable=False, default="system")
+
+
+class ResponseTarget(Base):
+    """Configurable response targets per priority (feature 2). Edited by administrators."""
+    __tablename__ = "response_targets"
+    priority: Mapped[str] = mapped_column(String(20), primary_key=True)
+    start_within_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    resolve_within_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    auto_escalate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_by: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+
+class Escalation(Base):
+    """A report that missed its response target and was raised to administrators."""
+    __tablename__ = "escalations"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    issue_id: Mapped[int] = mapped_column(Integer, ForeignKey("issues.id"), nullable=False, index=True)
+    # "start": not started in time; "resolve": not resolved in time.
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    priority: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(String(300), nullable=False)
+    escalated_to: Mapped[str] = mapped_column(String(40), nullable=False, default="administrators")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_by: Mapped[str | None] = mapped_column(String(80), nullable=True)

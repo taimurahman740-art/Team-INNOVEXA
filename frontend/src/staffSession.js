@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState} from "react";
 import {
-  assignIssue, bootstrapStaffAdmin, changeStaffPassword, createStaffUser, getIssueHistory, getResponseTimes,
+  acknowledgeEscalation, assignIssue, bootstrapStaffAdmin, changeStaffPassword, createStaffUser, getEscalations, getIssueHistory, getResponseTargets, getResponseTimes, runEscalationCheck, updateResponseTargets,
   getStaffIssues, getStaffSetupStatus, reviewDuplicate, getStaffUsers, loginStaff, resetStaffPassword, setStaffActive,
 } from "./api.js";
 
@@ -17,6 +17,7 @@ export function useStaffSession({issues = [], onUpdate, enabled = true} = {}) {
   const [staffIssues, setStaffIssues] = useState(issues);
   const [staffUsers, setStaffUsers] = useState([]);
   const [timings, setTimings] = useState(null);
+  const [targets, setTargets] = useState([]), [escalations, setEscalations] = useState([]);
   const [history, setHistory] = useState({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -30,6 +31,31 @@ export function useStaffSession({issues = [], onUpdate, enabled = true} = {}) {
       .finally(() => setAuthReady(true));
   }, [enabled]);
 
+  function loadEscalationData(accessToken) {
+    Promise.resolve().then(() => getResponseTargets(accessToken)).then(r => setTargets(Array.isArray(r) ? r : [])).catch(() => setTargets([]));
+    Promise.resolve().then(() => getEscalations(accessToken)).then(r => setEscalations(Array.isArray(r) ? r : [])).catch(() => setEscalations([]));
+  }
+  async function acknowledge(id) {
+    try {
+      const row = await acknowledgeEscalation(id, token);
+      setEscalations(old => old.map(e => (e.id === id ? row : e))); setError("");
+    } catch (err) { setError(err.message || "Could not acknowledge the escalation."); }
+  }
+  async function checkNow() {
+    try {
+      const r = await runEscalationCheck(token);
+      setSuccess(r?.created ? `${r.created} new ${r.created === 1 ? "escalation" : "escalations"} raised.` : "Check complete. No new overdue reports to escalate.");
+      loadEscalationData(token);
+    } catch (err) { setError(err.message || "Could not run the escalation check."); }
+  }
+  async function saveTargets(list) {
+    try {
+      setTargets(await updateResponseTargets(list, token));
+      setSuccess("Response targets saved."); setError("");
+      loadEscalationData(token);
+      return true;
+    } catch (err) { setError(err.message || "Could not save response targets."); return false; }
+  }
   function loadTimings(accessToken) {
     Promise.resolve().then(() => getResponseTimes(accessToken)).then(r => setTimings(r || null)).catch(() => setTimings(null));
   }
@@ -38,6 +64,7 @@ export function useStaffSession({issues = [], onUpdate, enabled = true} = {}) {
     const records = await getStaffIssues(session.access_token);
     const members = session.user.role === "admin" ? await getStaffUsers(session.access_token) : [];
     setToken(session.access_token); setUser(session.user); setStaffIssues(records); setStaffUsers(members); setError("");
+    loadEscalationData(session.access_token);
     if (session.user.role === "admin") loadTimings(session.access_token);
   }
 
@@ -54,7 +81,7 @@ export function useStaffSession({issues = [], onUpdate, enabled = true} = {}) {
   }
 
   const signOut = useCallback((notice = "") => {
-    setToken(""); setUser(null); setStaffUsers([]); setStaffIssues(issues); setHistory({}); setTimings(null);
+    setToken(""); setUser(null); setStaffUsers([]); setStaffIssues(issues); setHistory({}); setTimings(null); setTargets([]); setEscalations([]);
     setSetupAvailable(false); setBootstrapMode(false); setError(""); setSuccess(notice);
   }, [issues]);
 
@@ -62,6 +89,7 @@ export function useStaffSession({issues = [], onUpdate, enabled = true} = {}) {
     try {
       setStaffIssues(await getStaffIssues(token)); setError("");
       if (user?.role === "admin") loadTimings(token);
+      loadEscalationData(token);
     } catch (err) { setError(err.message || "Could not refresh tasks."); }
   }
 
@@ -128,7 +156,7 @@ export function useStaffSession({issues = [], onUpdate, enabled = true} = {}) {
   }
 
   return {
-    setupAvailable, authReady, bootstrapMode, setBootstrapMode, token, user, staffIssues, staffUsers, timings, history,
+    setupAvailable, authReady, bootstrapMode, setBootstrapMode, token, user, staffIssues, staffUsers, timings, history, targets, escalations, acknowledge, checkNow, saveTargets,
     error, setError, success, setSuccess, busy,
     signIn, signOut, refresh, changeStatus, assign, reviewDuplicateOf, loadHistory, addStaff, updateAccountActive, resetPassword, updateOwnPassword,
   };

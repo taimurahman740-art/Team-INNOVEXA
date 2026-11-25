@@ -100,3 +100,47 @@ export const MATCH_STRENGTH = {
   moderate: {label: "Moderate match", level: 2},
   uncertain: {label: "Uncertain", level: 1},
 };
+
+// Response targets (feature 2). Mirrors backend/app/escalation.py; the server's values win when loaded.
+export const DEFAULT_TARGETS = {
+  High: {start_within_minutes: 240, resolve_within_minutes: 1440, auto_escalate: true},
+  Medium: {start_within_minutes: 1440, resolve_within_minutes: 4320, auto_escalate: false},
+  Low: {start_within_minutes: 4320, resolve_within_minutes: 10080, auto_escalate: false},
+};
+export const targetMap = list => {
+  const map = {...DEFAULT_TARGETS};
+  (list || []).forEach(t => { map[t.priority] = t; });
+  return map;
+};
+
+/** Missed targets for an open report: [{kind: "start"|"resolve", dueAt, overdueMs}]. */
+export function overdueOf(issue, targets, now = Date.now()) {
+  if (!isOpen(issue)) return [];
+  const t = targets?.[issue.priority] || DEFAULT_TARGETS[issue.priority];
+  const created = new Date(issue.created_at).getTime();
+  if (!t || !Number.isFinite(created)) return [];
+  const out = [];
+  const startDue = created + t.start_within_minutes * 60000;
+  if (issue.status === "Submitted" && now > startDue) out.push({kind: "start", dueAt: startDue, overdueMs: now - startDue});
+  const resolveDue = created + t.resolve_within_minutes * 60000;
+  if (now > resolveDue) out.push({kind: "resolve", dueAt: resolveDue, overdueMs: now - resolveDue});
+  return out;
+}
+
+/** Short due/overdue text for task lists, e.g. "Start overdue by 2 h" or "Resolve due in 5 h". */
+export function dueText(issue, targets, now = Date.now()) {
+  if (!isOpen(issue)) return "";
+  const late = overdueOf(issue, targets, now);
+  if (late.length) {
+    const worst = late[late.length - 1];
+    return `${worst.kind === "start" ? "Start" : "Resolve"} overdue by ${formatDuration(worst.overdueMs)}`;
+  }
+  const t = targets?.[issue.priority] || DEFAULT_TARGETS[issue.priority];
+  if (!t) return "";
+  const created = new Date(issue.created_at).getTime();
+  const kind = issue.status === "Submitted" ? "start" : "resolve";
+  const due = created + (kind === "start" ? t.start_within_minutes : t.resolve_within_minutes) * 60000;
+  return `${kind === "start" ? "Start" : "Resolve"} due in ${formatDuration(due - now)}`;
+}
+
+export const minutesLabel = m => (m % 1440 === 0 ? `${m / 1440} ${m === 1440 ? "day" : "days"}` : m % 60 === 0 ? `${m / 60} h` : `${m} min`);

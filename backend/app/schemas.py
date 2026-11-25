@@ -83,6 +83,42 @@ class StaffUserCreate(BaseModel):
     password: str = Field(min_length=12, max_length=200)
     department: Department
     role: StaffRole = "staff"
+class ResponseTargetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    priority: Priority
+    start_within_minutes: int
+    resolve_within_minutes: int
+    auto_escalate: bool
+    updated_at: datetime | None = None
+    updated_by: str | None = None
+class ResponseTargetUpdate(BaseModel):
+    priority: Priority
+    # 15 minutes to 30 days; resolving cannot be due before starting.
+    start_within_minutes: int = Field(ge=15, le=43200)
+    resolve_within_minutes: int = Field(ge=15, le=43200)
+    auto_escalate: bool
+    @model_validator(mode="after")
+    def resolve_after_start(self):
+        if self.resolve_within_minutes < self.start_within_minutes:
+            raise ValueError("The resolve target must be at least as long as the start target.")
+        return self
+class ResponseTargetsUpdate(BaseModel):
+    targets: list[ResponseTargetUpdate] = Field(min_length=1, max_length=3)
+class EscalationRead(BaseModel):
+    id: int
+    issue_id: int
+    kind: str
+    priority: str
+    target_minutes: int
+    reason: str
+    escalated_to: str
+    created_at: datetime
+    acknowledged_at: datetime | None = None
+    acknowledged_by: str | None = None
+    issue_title: str
+    issue_status: str
+    issue_department: str | None = None
+    issue_location: str | None = None
 class StaffUserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

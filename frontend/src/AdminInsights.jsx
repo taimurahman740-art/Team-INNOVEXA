@@ -1,7 +1,7 @@
-import {useMemo} from "react";
-import {AlertTriangle, ChevronRight, Repeat, ShieldCheck} from "lucide-react";
+import {useMemo, useState} from "react";
+import {AlertTriangle, ChevronRight, RefreshCw, Repeat, ShieldCheck, Siren} from "lucide-react";
 import {BarList, ColumnChart, EmptyState, Metric, PendingNotice, PriorityBadge, StatusBadge} from "./components.jsx";
-import {CATEGORIES, DEPARTMENTS, buildingOf, categoryName, displayStatus, formatDuration, isOpen, weeklyCounts} from "./ui.js";
+import {CATEGORIES, DEPARTMENTS, buildingOf, categoryName, displayStatus, formatDateTime, formatDuration, isOpen, overdueOf, targetMap, timeAgo, weeklyCounts} from "./ui.js";
 
 const RECURRING_MIN = 2;
 const age = i => Date.now() - new Date(i.created_at).getTime();
@@ -10,7 +10,7 @@ const seconds = v => (v == null ? null : formatDuration(v * 1000));
 // Status of the eight approved features, as implemented in this build.
 const FEATURES = [
   ["Administrator analytics and recurring problems", "live", "This dashboard"],
-  ["Automatic escalation and response-time management", "pending", "Response targets, overdue detection and alerts not built yet"],
+  ["Automatic escalation and response-time management", "live", "Configurable targets, overdue detection, admin alerts and history"],
   ["Maintenance dashboard and student tracking", "live", "Staff tasks and tracking codes"],
   ["Automatic department routing", "live", "Category to department, with reason shown"],
   ["Machine-learning priority prediction", "partial", "Random Forest baseline with a safety floor; resolution-time feature pending"],
@@ -56,7 +56,7 @@ function useStats(issues) {
   }, [issues]);
 }
 
-function Overview({issues, d, timings, onOpen}) {
+function Overview({issues, d, timings, s, onOpen}) {
   const resolved = issues.length - d.open.length;
   const avg = timings ? seconds(timings.resolution.average_seconds) : null;
   return <>
@@ -65,7 +65,7 @@ function Overview({issues, d, timings, onOpen}) {
       <Metric label="Open" value={d.open.length} note="Awaiting resolution"/>
       <Metric label="Resolved" value={resolved} note="Resolved or closed"/>
       <Metric label="Critical open" value={d.critical.length} note="High priority, unresolved" tone={d.critical.length ? "critical" : ""}/>
-      <Metric label="Overdue" value="Pending" note="Needs response targets" pending/>
+      <Metric label="Overdue" value={d.open.filter(i => overdueOf(i, targetMap(s?.targets)).length).length} note="Past a response target" tone={d.open.some(i => overdueOf(i, targetMap(s?.targets)).length) ? "warning" : ""}/>
       <Metric label="Avg. resolution" value={avg || "No data"} note={timings ? `From ${timings.resolution.count} resolved with history` : "Loading timing data"}/>
     </section>
     <div className="grid-2 grid-wide-left">
@@ -146,29 +146,93 @@ function Recurring({d}) {
   </>;
 }
 
-function Escalations({d}) {
-  return <>
-    <PendingNotice title="Automatic escalation is not built yet">Priority-based response targets, overdue detection, response-time breaches, escalation history and alerts are planned (feature 2). Until then, this page lists real open reports by age so nothing urgent is missed.</PendingNotice>
-    <section className="panel">
-      <div className="panel-head"><div><h2>Critical unresolved reports</h2><p>High priority and still open, oldest first.</p></div></div>
-      {d.critical.length === 0 ? <EmptyState icon={ShieldCheck} title="No critical reports open"/> :
+function TargetsForm({s}) {
+  const current = targetMap(s.targets);
+  const [rows, setRows] = useState(null);
+  const data = rows || ["High", "Medium", "Low"].map(p => ({priority: p, ...current[p]}));
+  const set = (k, field, value) => setRows(data.map((r, i) => (i === k ? {...r, [field]: value} : r)));
+  const hours = m => Math.round(m / 6) / 10;
+  const invalid = data.some(r => !(r.start_within_minutes >= 15 && r.resolve_within_minutes >= r.start_within_minutes && r.resolve_within_minutes <= 43200));
+  return <section className="panel">
+    <div className="panel-head"><div><h2>Response targets</h2><p>How fast each priority must be started and resolved. Auto-escalate raises an alert to administrators when a target is missed.</p></div></div>
+    <form className="targets-form" onSubmit={async e => { e.preventDefault(); if (await s.saveTargets(data.map(({priority, start_within_minutes, resolve_within_minutes, auto_escalate}) => ({priority, start_within_minutes, resolve_within_minutes, auto_escalate})))) setRows(null); }}>
       <div className="table-wrap"><table className="table">
-        <thead><tr><th scope="col">ID</th><th scope="col">Report</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col">Open for</th></tr></thead>
-        <tbody>{d.critical.map(i => <tr key={i.id}><td data-label="ID" className="cell-id">#{i.id}</td><td data-label="Report"><div className="cell-title"><h3>{i.title}</h3><span className="cell-sub">{i.location}</span></div></td><td data-label="Department">{i.department}</td><td data-label="Status"><StatusBadge status={displayStatus(i)}/></td><td data-label="Open for">{formatDuration(age(i))}</td></tr>)}</tbody>
+        <thead><tr><th scope="col">Priority</th><th scope="col">Start within (hours)</th><th scope="col">Resolve within (hours)</th><th scope="col">Auto-escalate</th></tr></thead>
+        <tbody>{data.map((r, k) => <tr key={r.priority}>
+          <td data-label="Priority"><PriorityBadge priority={r.priority}/></td>
+          <td data-label="Start within (hours)"><input className="input-num" type="number" min="0.25" max="720" step="0.25" aria-label={`${r.priority}: start within hours`} value={hours(r.start_within_minutes)} onChange={e => set(k, "start_within_minutes", Math.round(Number(e.target.value) * 60))}/></td>
+          <td data-label="Resolve within (hours)"><input className="input-num" type="number" min="0.25" max="720" step="0.25" aria-label={`${r.priority}: resolve within hours`} value={hours(r.resolve_within_minutes)} onChange={e => set(k, "resolve_within_minutes", Math.round(Number(e.target.value) * 60))}/></td>
+          <td data-label="Auto-escalate"><label className="switch"><input type="checkbox" checked={!!r.auto_escalate} onChange={e => set(k, "auto_escalate", e.target.checked)}/><span>{r.auto_escalate ? "On" : "Off"}</span></label></td>
+        </tr>)}</tbody>
+      </table></div>
+      {invalid && <p className="inline-error" role="alert">Each target must be at least 15 minutes, at most 30 days, and resolving cannot be due before starting.</p>}
+      <div className="form-actions">
+        {rows && <button type="button" className="btn btn-secondary" onClick={() => setRows(null)}>Discard changes</button>}
+        <button className="btn btn-primary" disabled={!rows || invalid}>Save targets</button>
+      </div>
+    </form>
+  </section>;
+}
+
+function Escalations({d, s}) {
+  const targets = targetMap(s?.targets);
+  const alerts = (s?.escalations || []).filter(e => !e.acknowledged_at);
+  const history = s?.escalations || [];
+  // One row per report: list every missed target, rank by the longest overdue.
+  const breaches = d.open.map(i => ({issue: i, missed: overdueOf(i, targets)})).filter(r => r.missed.length)
+    .map(r => ({...r, overdueMs: Math.max(...r.missed.map(m => m.overdueMs))})).sort((a, b) => b.overdueMs - a.overdueMs);
+  const missedText = missed => (missed.length > 1 ? "Not started or resolved in time" : missed[0].kind === "start" ? "Not started in time" : "Not resolved in time");
+  return <>
+    <section className="metrics" aria-label="Escalation summary">
+      <Metric label="Open alerts" value={alerts.length} note="Escalated, not yet acknowledged" tone={alerts.length ? "critical" : ""}/>
+      <Metric label="Overdue reports" value={breaches.length} note="Past a response target"/>
+      <Metric label="Critical open" value={d.critical.length} note="High priority, unresolved"/>
+      <Metric label="Escalations recorded" value={history.length} note="All time"/>
+    </section>
+    <section className="panel">
+      <div className="panel-head"><div><h2>Open alerts</h2><p>Reports escalated to administrators automatically. Acknowledge one once someone is handling it.</p></div><button className="btn btn-secondary btn-sm" onClick={s.checkNow}><RefreshCw size={14}/>Check now</button></div>
+      {alerts.length === 0 ? <EmptyState icon={ShieldCheck} title="No open alerts">Every escalated report has been acknowledged, or no report has missed an auto-escalate target.</EmptyState> :
+      <ul className="alert-list">{alerts.map(e => <li key={e.id}>
+        <Siren size={18} aria-hidden="true"/>
+        <div><strong>#{e.issue_id} {e.issue_title}</strong><span>{e.reason} {e.issue_department}. Raised {timeAgo(e.created_at)}.</span></div>
+        <button className="btn btn-primary btn-sm" onClick={() => s.acknowledge(e.id)}>Acknowledge</button>
+      </li>)}</ul>}
+    </section>
+    <section className="panel">
+      <div className="panel-head"><div><h2>Response-time breaches</h2><p>Open reports past their start or resolve target, any priority, most overdue first.</p></div></div>
+      {breaches.length === 0 ? <EmptyState icon={ShieldCheck} title="No overdue reports">Every open report is within its response targets.</EmptyState> :
+      <div className="table-wrap"><table className="table">
+        <thead><tr><th scope="col">ID</th><th scope="col">Report</th><th scope="col">Priority</th><th scope="col">Missed target</th><th scope="col" className="num">Overdue by</th></tr></thead>
+        <tbody>{breaches.map(b => <tr key={b.issue.id}>
+          <td data-label="ID" className="cell-id">#{b.issue.id}</td>
+          <td data-label="Report"><div className="cell-title"><h3>{b.issue.title}</h3><span className="cell-sub">{b.issue.department}</span></div></td>
+          <td data-label="Priority"><PriorityBadge priority={b.issue.priority}/></td>
+          <td data-label="Missed target">{missedText(b.missed)}</td>
+          <td data-label="Overdue by" className="num">{formatDuration(b.overdueMs)}</td>
+        </tr>)}</tbody>
       </table></div>}
     </section>
     <section className="panel">
-      <div className="panel-head"><div><h2>Oldest open reports</h2><p>Every priority, the 8 longest open.</p></div></div>
-      {d.open.length === 0 ? <EmptyState icon={ShieldCheck} title="No open reports"/> :
-      <ul className="item-list">{[...d.open].sort((a, b) => age(b) - age(a)).slice(0, 8).map(i => <li key={i.id}><div><strong>#{i.id} {i.title}</strong><span>{i.department}</span></div><span className="item-side"><PriorityBadge priority={i.priority}/><span className="cell-sub">Open {formatDuration(age(i))}</span></span></li>)}</ul>}
+      <div className="panel-head"><div><h2>Escalation history</h2><p>Every escalation raised, newest first.</p></div></div>
+      {history.length === 0 ? <EmptyState icon={Siren} title="No escalations yet">When an auto-escalate report misses its target, it is recorded here.</EmptyState> :
+      <div className="table-wrap"><table className="table">
+        <thead><tr><th scope="col">Raised</th><th scope="col">Report</th><th scope="col">Reason</th><th scope="col">Acknowledged</th></tr></thead>
+        <tbody>{history.map(e => <tr key={e.id}>
+          <td data-label="Raised">{formatDateTime(e.created_at)}</td>
+          <td data-label="Report"><div className="cell-title"><h3>#{e.issue_id} {e.issue_title}</h3><span className="cell-sub">{displayStatus({status: e.issue_status})}</span></div></td>
+          <td data-label="Reason">{e.reason}</td>
+          <td data-label="Acknowledged">{e.acknowledged_at ? `${formatDateTime(e.acknowledged_at)} by ${e.acknowledged_by}` : <span className="badge badge-priority-high">Open</span>}</td>
+        </tr>)}</tbody>
+      </table></div>}
     </section>
+    <TargetsForm s={s}/>
   </>;
 }
 
-export default function AdminInsights({issues, timings, section = "overview", onOpen = () => {}}) {
+export default function AdminInsights({issues, timings, s, section = "overview", onOpen = () => {}}) {
   const d = useStats(issues);
   if (section === "analytics") return <Analytics issues={issues} d={d} timings={timings}/>;
   if (section === "recurring") return <Recurring d={d}/>;
-  if (section === "escalations") return <Escalations d={d}/>;
-  return <Overview issues={issues} d={d} timings={timings} onOpen={onOpen}/>;
+  if (section === "escalations") return <Escalations d={d} s={s}/>;
+  return <Overview issues={issues} d={d} timings={timings} s={s} onOpen={onOpen}/>;
 }

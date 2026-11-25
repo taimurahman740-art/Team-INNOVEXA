@@ -13,6 +13,7 @@ vi.mock("./api.js",()=>({
   changeStaffPassword:vi.fn(),setStaffActive:vi.fn(),resetStaffPassword:vi.fn(),
   getResponseTimes:vi.fn(()=>Promise.resolve(null)),
   reviewDuplicate:vi.fn(),
+  getResponseTargets:vi.fn(()=>Promise.resolve([])),updateResponseTargets:vi.fn(),getEscalations:vi.fn(()=>Promise.resolve([])),acknowledgeEscalation:vi.fn(),runEscalationCheck:vi.fn(),
 }));
 afterEach(()=>{cleanup();vi.clearAllMocks();});
 

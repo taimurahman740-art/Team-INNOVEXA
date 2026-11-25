@@ -10,17 +10,19 @@ from sqlalchemy.orm import Session
 
 from .auth import TOKEN_LIFETIME_SECONDS, create_access_token, get_current_staff, hash_password, require_admin, verify_password
 from .database import get_db
-from .models import Issue, IssueStatusHistory, StaffUser
+from .models import Escalation, Issue, IssueStatusHistory, ResponseTarget, StaffUser
 from .schemas import (
     IssueCreate, ImageClassificationRequest, IssueRead, IssuePublicRead,
     IssueStatusUpdate, IssueStatusHistoryRead, IssueTrackingRead,
     IssueAssignmentUpdate, DuplicateReview, StaffLogin, StaffBootstrap, StaffUserCreate,
     StaffUserRead, StaffTokenRead, StaffSetupStatus,
+    EscalationRead, ResponseTargetRead, ResponseTargetsUpdate,
 )
 from .image_recognition import classify_campus_image
 from .priority_model import predict_priority
 from .duplicates import OPEN_STATUSES, find_possible_duplicates
 from .analytics import response_time_stats
+from .escalation import run_check
 from .services import assess_safety_risk, choose_category, classify_issue, merge_image_hazard_risk, routing_reason, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
@@ -138,6 +140,7 @@ def _department_scope(statement, user: StaffUser):
 
 @router.get("/staff", response_model=list[IssueRead])
 def list_staff_issues(user: StaffUser = Depends(get_current_staff), db: Session = Depends(get_db)):
+    run_check(db)  # throttled overdue/escalation check (no scheduler on Render's free tier)
     statement = select(Issue).order_by(Issue.created_at.desc())
     return db.scalars(_department_scope(statement, user)).all()
 
@@ -190,6 +193,60 @@ def assign_issue(issue_id: int, payload: IssueAssignmentUpdate, admin: StaffUser
     db.commit()
     db.refresh(issue)
     return issue
+
+
+@router.get("/response-targets", response_model=list[ResponseTargetRead])
+def list_response_targets(user: StaffUser = Depends(get_current_staff), db: Session = Depends(get_db)):
+    order = {"High": 0, "Medium": 1, "Low": 2}
+    return sorted(db.query(ResponseTarget).all(), key=lambda t: order.get(t.priority, 9))
+
+
+@router.patch("/response-targets", response_model=list[ResponseTargetRead])
+def update_response_targets(payload: ResponseTargetsUpdate, admin: StaffUser = Depends(require_admin), db: Session = Depends(get_db)):
+    if len({t.priority for t in payload.targets}) != len(payload.targets):
+        raise HTTPException(status_code=422, detail="Each priority can appear only once.")
+    for t in payload.targets:
+        row = db.get(ResponseTarget, t.priority) or ResponseTarget(priority=t.priority)
+        row.start_within_minutes, row.resolve_within_minutes, row.auto_escalate = t.start_within_minutes, t.resolve_within_minutes, t.auto_escalate
+        row.updated_at, row.updated_by = datetime.now(timezone.utc), admin.email[:80]
+        db.add(row)
+    db.commit()
+    run_check(db, force=True)
+    return list_response_targets(admin, db)
+
+
+def _escalation_read(e: Escalation, issue: Issue) -> dict:
+    return {**{c: getattr(e, c) for c in ("id", "issue_id", "kind", "priority", "target_minutes", "reason", "escalated_to", "created_at", "acknowledged_at", "acknowledged_by")},
+            "issue_title": issue.title, "issue_status": issue.status, "issue_department": issue.department, "issue_location": issue.location}
+
+
+@router.get("/escalations", response_model=list[EscalationRead])
+def list_escalations(user: StaffUser = Depends(get_current_staff), db: Session = Depends(get_db)):
+    """Admins see every escalation; staff see those for their department."""
+    run_check(db)
+    query = db.query(Escalation, Issue).join(Issue, Issue.id == Escalation.issue_id)
+    if user.role != "admin":
+        query = query.filter(Issue.department == user.department)
+    return [_escalation_read(e, i) for e, i in query.order_by(Escalation.created_at.desc()).limit(300).all()]
+
+
+@router.post("/escalations/check")
+def check_escalations(admin: StaffUser = Depends(require_admin), db: Session = Depends(get_db)):
+    return {"created": run_check(db, force=True)}
+
+
+@router.post("/escalations/{escalation_id}/acknowledge", response_model=EscalationRead)
+def acknowledge_escalation(escalation_id: int, user: StaffUser = Depends(get_current_staff), db: Session = Depends(get_db)):
+    escalation = db.get(Escalation, escalation_id)
+    if escalation is None:
+        raise HTTPException(status_code=404, detail="Escalation not found")
+    issue = db.get(Issue, escalation.issue_id)
+    if user.role != "admin" and issue.department != user.department:
+        raise HTTPException(status_code=403, detail="This escalation is outside your department.")
+    if escalation.acknowledged_at is None:
+        escalation.acknowledged_at, escalation.acknowledged_by = datetime.now(timezone.utc), user.email[:80]
+        db.commit()
+    return _escalation_read(escalation, issue)
 
 
 @router.get("/analytics/response-times")

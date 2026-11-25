@@ -29,6 +29,11 @@ async def lifespan(app: FastAPI):
         for name, definition in [("image_data","TEXT"),("classification_confidence","FLOAT"),("risk_score","INTEGER NOT NULL DEFAULT 0"),("risk_level","VARCHAR(20) NOT NULL DEFAULT 'Low'"),("risk_reasons","JSON NOT NULL DEFAULT '[]'"),("building","VARCHAR(80)"),("ai_analysis","JSON"),("equipment","VARCHAR(80)"),("resolution_note","TEXT")]:
             if name not in columns:
                 connection.execute(text(f"ALTER TABLE issues ADD COLUMN {name} {definition}"))
+    # Default response targets (feature 2): inserted only when a priority has none.
+    from .database import SessionLocal
+    from .escalation import ensure_default_targets
+    with SessionLocal() as db:
+        ensure_default_targets(db)
     # Train the small priority model once at startup so the first report is not slowed down.
     from .priority_model import get_model
     get_model()

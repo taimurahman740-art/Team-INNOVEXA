@@ -239,4 +239,37 @@ class IssueApiTests(unittest.TestCase):
         issue = self.client.post("/issues", json=self.payload()).json()
         self.assertEqual(self.client.patch(f"/issues/{issue['id']}/duplicate-review", json={"decision": "not_duplicate"}).status_code, 401)
 
+    def backdate(self, issue_id, hours):
+        from datetime import datetime, timedelta, timezone
+        from app.models import Issue
+        with self.Session() as db:
+            row = db.get(Issue, issue_id); row.created_at = datetime.now(timezone.utc) - timedelta(hours=hours); db.commit()
+
+    def test_overdue_high_priority_report_is_escalated_once_and_can_be_acknowledged(self):
+        headers = self.staff_session()
+        issue = self.client.post("/issues", json=self.payload(title="Exposed wire", description="Exposed electrical wire sparking near the door")).json()
+        self.assertEqual(issue["priority"], "High")
+        self.backdate(issue["id"], 5)
+        self.assertEqual(self.client.post("/issues/escalations/check", headers=headers).json()["created"], 1)
+        self.assertEqual(self.client.post("/issues/escalations/check", headers=headers).json()["created"], 0)
+        rows = self.client.get("/issues/escalations", headers=headers).json()
+        self.assertEqual((rows[0]["issue_id"], rows[0]["kind"]), (issue["id"], "start"))
+        ack = self.client.post(f"/issues/escalations/{rows[0]['id']}/acknowledge", headers=headers)
+        self.assertEqual(ack.status_code, 200, ack.text)
+        self.assertIsNotNone(ack.json()["acknowledged_at"])
+        self.assertEqual(self.client.get(f"/issues/track/{issue['tracking_code']}").json()["status"], "Submitted")  # status unchanged
+
+    def test_response_targets_can_be_changed_by_admin_and_are_validated(self):
+        headers = self.staff_session()
+        ok = self.client.patch("/issues/response-targets", json={"targets": [{"priority": "Medium", "start_within_minutes": 60, "resolve_within_minutes": 600, "auto_escalate": True}]}, headers=headers)
+        self.assertEqual(ok.status_code, 200, ok.text)
+        medium = [t for t in ok.json() if t["priority"] == "Medium"][0]
+        self.assertEqual((medium["start_within_minutes"], medium["auto_escalate"]), (60, True))
+        bad = self.client.patch("/issues/response-targets", json={"targets": [{"priority": "High", "start_within_minutes": 600, "resolve_within_minutes": 60, "auto_escalate": True}]}, headers=headers)
+        self.assertEqual(bad.status_code, 422)
+
+    def test_escalation_endpoints_require_staff(self):
+        self.assertEqual(self.client.get("/issues/escalations").status_code, 401)
+        self.assertEqual(self.client.post("/issues/escalations/check").status_code, 401)
+
 if __name__=="__main__": unittest.main()

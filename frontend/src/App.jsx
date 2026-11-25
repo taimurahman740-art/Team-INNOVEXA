@@ -30,7 +30,7 @@ const VIEWS = {
  "admin-reports": ["All reports", "Search, assign and update any report.", "reports"],
  "admin-analytics": ["Analytics", "Trends, categories, buildings and response performance.", "analytics"],
  "admin-recurring": ["Recurring problems", "Repeated issues by category, building and location.", "recurring"],
- "admin-escalations": ["Escalations", "Critical and long-open reports.", "escalations"],
+ "admin-escalations": ["Escalations", "Response targets, overdue reports and alerts.", "escalations"],
  "admin-team": ["Staff management", "Create accounts and manage access.", "team"],
  account: ["Account", "Your staff account.", "account"],
 };
@@ -128,6 +128,9 @@ export default function App() {
  const resolved=issues.length-open;
  const recent=[...issues].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
  const unread=unreadUpdates(mine);
+ // Signed-in staff see open escalation alerts under the bell; students see updates on their reports.
+ const staffAlerts=staffUser?(session.escalations||[]).filter(e=>!e.acknowledged_at):[];
+ const bellCount=staffUser?staffAlerts.length:unread.length;
 
  function saved(item){
   setIssues(old=>[item,...old.filter(i=>typeof i.id==="number")]);setLive(true);
@@ -181,11 +184,18 @@ export default function App() {
     <div className="page-actions">
      <span className={`conn-pill ${loading?"checking":live?"connected":""}`}><i aria-hidden="true"/>{loading?"Connecting…":live?"Backend connected":"Demo mode"}</span>
      <div className="popover-anchor" ref={bellRef}>
-      <button className="icon-btn bell" aria-label={`Notifications${unread.length?`, ${unread.length} new`:""}`} aria-expanded={bellOpen} onClick={()=>setBellOpen(o=>!o)}><Bell size={19}/>{unread.length>0&&<span className="bell-count">{unread.length}</span>}</button>
+      <button className="icon-btn bell" aria-label={`Notifications${bellCount?`, ${bellCount} new`:""}`} aria-expanded={bellOpen} onClick={()=>setBellOpen(o=>!o)}><Bell size={19}/>{bellCount>0&&<span className="bell-count">{bellCount}</span>}</button>
       {bellOpen&&<div className="popover" role="dialog" aria-label="Notifications">
-       <div className="popover-head"><strong>Notifications</strong>{unread.length>0&&<button className="btn btn-ghost btn-sm" onClick={markRead}>Mark all as read</button>}</div>
-       <Notifications compact reports={mine} onTrack={track}/>
-       <button className="btn btn-secondary btn-sm btn-block" onClick={()=>go("notifications")}>View all</button>
+       {staffUser?<>
+        <div className="popover-head"><strong>Escalation alerts</strong></div>
+        {staffAlerts.length?<ul className="alert-list compact">{staffAlerts.slice(0,5).map(e=><li key={e.id}><Siren size={16} aria-hidden="true"/><div><strong>#{e.issue_id} {e.issue_title}</strong><span>{e.reason}</span></div></li>)}</ul>
+        :<p className="muted popover-empty">No open escalation alerts.</p>}
+        <button className="btn btn-secondary btn-sm btn-block" onClick={()=>{setBellOpen(false);go(isAdmin?"admin-escalations":"staff-dashboard");}}>{isAdmin?"Open escalations":"Open dashboard"}</button>
+       </>:<>
+        <div className="popover-head"><strong>Notifications</strong>{unread.length>0&&<button className="btn btn-ghost btn-sm" onClick={markRead}>Mark all as read</button>}</div>
+        <Notifications compact reports={mine} onTrack={track}/>
+        <button className="btn btn-secondary btn-sm btn-block" onClick={()=>go("notifications")}>View all</button>
+       </>}
       </div>}
      </div>
      {staffUser?<div className="popover-anchor">

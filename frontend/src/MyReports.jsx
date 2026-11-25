@@ -52,7 +52,7 @@ export function Notifications({reports, onMarkRead, onTrack, compact = false}) {
         {updates.length > 0 && <button className="btn btn-secondary btn-sm" onClick={onMarkRead}><CheckCheck size={14}/>Mark all as read</button>}
       </div>
       {updates.length ? list : <EmptyState icon={Bell} title="You are up to date">When staff start or resolve one of your reports, the update appears here.</EmptyState>}
-      <p className="field-hint">Email and push notifications are not part of this prototype. Staff escalation alerts are pending (escalation feature).</p>
+      <p className="field-hint">Email and push notifications are not part of this prototype. Updates appear here and under the bell.</p>
     </section>
   );
 }

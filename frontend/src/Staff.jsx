@@ -1,9 +1,9 @@
 import {useEffect, useMemo, useState} from "react";
-import {AlertTriangle, ChevronRight, Copy, Clock3, Image as ImageIcon, KeyRound, LayoutDashboard, ListChecks, LockKeyhole, LogOut, MapPin, RefreshCw, Search, ShieldCheck, UserPlus, Users, X} from "lucide-react";
+import {AlertTriangle, ChevronRight, Copy, Clock3, Image as ImageIcon, KeyRound, LayoutDashboard, ListChecks, LockKeyhole, LogOut, MapPin, RefreshCw, Search, ShieldCheck, Siren, UserPlus, Users, X} from "lucide-react";
 import AdminInsights from "./AdminInsights.jsx";
 import {useStaffSession} from "./staffSession.js";
 import {AiTag, CategoryTag, ConfirmDialog, EmptyState, Metric, PriorityBadge, SeverityBadge, SkeletonRows, StatusBadge} from "./components.jsx";
-import {DEPARTMENTS, buildingOf, displayStatus, formatDate, formatDateTime, formatDuration, isOpen, priorityRank, responseTimes, severityOf, timeAgo} from "./ui.js";
+import {DEPARTMENTS, buildingOf, displayStatus, dueText, overdueOf, targetMap, formatDate, formatDateTime, formatDuration, isOpen, priorityRank, responseTimes, severityOf, timeAgo} from "./ui.js";
 
 const STATUS_FILTERS = [["open", "All open"], ["Submitted", "Submitted"], ["Assigned", "Assigned"], ["In Progress", "In progress"], ["resolved", "Resolved"], ["all", "All statuses"]];
 const SORTS = [["priority", "Priority, then oldest"], ["oldest", "Oldest first"], ["newest", "Newest first"]];
@@ -119,6 +119,8 @@ function TaskDrawer({issue, s, onClose, onResolve}) {
 }
 
 function TaskList({s, scope, title, sub}) {
+  const targets = targetMap(s.targets);
+  const escalatedIds = new Set((s.escalations || []).filter(e => !e.acknowledged_at).map(e => e.issue_id));
   const user = s.user;
   const [query, setQuery] = useState(""), [status, setStatus] = useState("open"), [priority, setPriority] = useState("All"), [dept, setDept] = useState("All"), [sort, setSort] = useState("priority");
   const [detail, setDetail] = useState(null), [confirm, setConfirm] = useState(null), [note, setNote] = useState("");
@@ -158,7 +160,7 @@ function TaskList({s, scope, title, sub}) {
         <td data-label="Severity"><SeverityBadge severity={severityOf(i.risk_level)}/></td>
         <td data-label="Department">{i.department}</td>
         <td data-label="Submitted"><span className="cell-date">{formatDate(i.created_at)}</span><span className="cell-sub"><Clock3 size={13} aria-hidden="true"/>{isOpen(i) ? `Open ${formatDuration(Date.now() - new Date(i.created_at).getTime())}` : timeAgo(i.created_at)}</span></td>
-        <td data-label="Status"><StatusBadge status={displayStatus(i)}/></td>
+        <td data-label="Status"><div className="status-cell"><StatusBadge status={displayStatus(i)}/>{escalatedIds.has(i.id) && <span className="badge badge-escalated"><Siren size={12} aria-hidden="true"/>Escalated</span>}{isOpen(i) && <span className={`due-text ${overdueOf(i, targets).length ? "late" : ""}`}>{dueText(i, targets)}</span>}</div></td>
         <td data-label="Actions"><div className="row-actions">
           {user.role === "admin" && <label className="inline-select compact"><span className="visually-hidden">Assign to</span><select value={i.assigned_staff_id || ""} onChange={e => s.assign(i.id, e.target.value)}><option value="">Unassigned</option>{s.staffUsers.filter(m => m.is_active && m.role === "staff" && m.department === i.department).map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}</select></label>}
           {i.status === "Submitted" && <button className="btn btn-secondary btn-sm" onClick={() => s.changeStatus(i.id, "In Progress")}>Start work</button>}
@@ -181,6 +183,7 @@ function TaskList({s, scope, title, sub}) {
 
 function StaffDashboard({s, onOpen}) {
   const user = s.user;
+  const overdueCount = s.staffIssues.filter(i => overdueOf(i, targetMap(s.targets)).length).length;
   const d = useMemo(() => {
     const open = s.staffIssues.filter(isOpen);
     return {
@@ -197,7 +200,7 @@ function StaffDashboard({s, onOpen}) {
       <Metric label="Pending" value={d.pending} note="Not started yet"/>
       <Metric label="In progress" value={d.progress} note="Work started"/>
       <Metric label="High priority" value={d.high.length} note="Open, handle first" tone={d.high.length ? "critical" : ""}/>
-      <Metric label="Overdue" value="Pending" note="Response targets not configured" pending/>
+      <Metric label="Overdue" value={overdueCount} note="Past a response target" tone={overdueCount ? "warning" : ""}/>
     </section>
     <div className="grid-2">
       <section className="panel">
@@ -307,7 +310,7 @@ export default function Staff({issues, live, onUpdate, session, section, onSecti
     {view === "dashboard" && <StaffDashboard s={s} onOpen={go}/>}
     {view === "assigned" && <TaskList s={s} scope="assigned" title="Assigned to you" sub="Open reports an administrator assigned to you."/>}
     {(view === "tasks" || view === "reports") && <TaskList s={s} scope="all" title={isAdmin ? "All reports" : "Department tasks"} sub={isAdmin ? "Every report on campus. Assign, start and resolve from here." : `Reports routed to ${user.department}.`}/>}
-    {["overview", "analytics", "recurring", "escalations"].includes(view) && <AdminInsights section={view} issues={s.staffIssues} timings={s.timings} onOpen={go}/>}
+    {["overview", "analytics", "recurring", "escalations"].includes(view) && <AdminInsights section={view} issues={s.staffIssues} timings={s.timings} s={s} onOpen={go}/>}
     {view === "team" && <Team s={s}/>}
     {view === "account" && <Account s={s}/>}
   </div>;
