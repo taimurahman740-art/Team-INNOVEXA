@@ -9,7 +9,7 @@ All models live in `backend/app/`. Every AI result is a suggestion that staff re
 | Multimodal image + text classification, photo-only reports | In use | `image_recognition.py`, `services.choose_category` |
 | Hazard detection and severity (zero-shot CLIP) | In use, confirmed by staff | `image_recognition.py` |
 | Priority prediction (Random Forest) | In use as a baseline | `priority_model.py` |
-| Duplicate-ticket detection | Pending | — |
+| Duplicate-ticket detection | In use, flags for staff review | `duplicates.py` |
 
 ## Priority prediction (feature 5)
 
@@ -38,3 +38,24 @@ The model's most common error is predicting Low for a Medium report.
 **Limitation:** these figures come from a tiny, mostly synthetic dataset written by the team. They show that the pipeline works and that the model is at least as good as the rules on this data. They are **not** real-world accuracy. Before claiming performance, collect human-labelled Neon reports, keep a held-out test set, retrain, and re-run the evaluation.
 
 **Fallback:** if scikit-learn is missing or training fails, the API uses the keyword rules and records `method: "rules"`.
+
+## Duplicate-ticket detection (feature 7)
+
+**When:** every new report is compared with open reports (Submitted or In Progress) in the same department or the same building, using the 50 most recent. The check never blocks, rejects, merges or closes a report. Matches are stored in `ai_analysis.duplicates`, and staff confirm or dismiss them with `PATCH /issues/{id}/duplicate-review`.
+
+**Text similarity:** TF-IDF vectors of title + description (unigrams and bigrams, English stop words removed, sublinear term frequency), compared with cosine similarity. The vocabulary is fitted on the sample dataset plus the reports being compared.
+
+**Image similarity:** a 320-value feature vector per photo, compared with cosine similarity. It joins a mean-centred 16×16 greyscale layout with a 4×4×4 RGB colour histogram. It recognises the same scene photographed again. It is **not** a learned embedding, so two different photos of the same *kind* of problem will not match.
+
+**Decision:** a report is flagged when its text similarity is at least 0.25, or its photo similarity is at least 0.60, or the combined score (0.6 × text + 0.4 × photo) is at least 0.35 in the same building. At most three matches are kept. The thresholds can be changed with `DUPLICATE_TEXT_THRESHOLD`, `DUPLICATE_IMAGE_THRESHOLD` and `DUPLICATE_COMBINED_THRESHOLD`.
+
+**Calibration** (`tests/test_duplicates.py`, hand-made, small):
+
+| Pair type | Score |
+|---|---|
+| 4 reworded duplicates (text) | 0.27–0.52 |
+| 4 different problems, same department (text) | 0.00–0.04 |
+| Same scene photographed again: shifted, brighter, cropped | 0.71 |
+| Different scene | 0.17 |
+
+**Limitation:** these checks are hand-made examples, not real campus data. Check the thresholds on real reports and photos, and count false flags from the staff reviews (`review.decision`), before claiming performance.

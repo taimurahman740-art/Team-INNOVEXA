@@ -63,6 +63,9 @@ class IssueStatusUpdate(BaseModel):
     status: Status
     # Optional work note saved with the update (for example, what was repaired).
     resolution_note: str | None = Field(default=None, max_length=2000)
+class DuplicateReview(BaseModel):
+    decision: Literal["duplicate", "not_duplicate"]
+    duplicate_of: int | None = Field(default=None, ge=1)
 class IssueAssignmentUpdate(BaseModel):
     staff_user_id: int | None = Field(default=None, ge=1)
 class StaffLogin(BaseModel):

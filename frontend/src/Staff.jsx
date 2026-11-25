@@ -1,8 +1,8 @@
 import {useEffect, useMemo, useState} from "react";
-import {AlertTriangle, ChevronRight, Clock3, Image as ImageIcon, KeyRound, LayoutDashboard, ListChecks, LockKeyhole, LogOut, MapPin, RefreshCw, Search, ShieldCheck, UserPlus, Users, X} from "lucide-react";
+import {AlertTriangle, ChevronRight, Copy, Clock3, Image as ImageIcon, KeyRound, LayoutDashboard, ListChecks, LockKeyhole, LogOut, MapPin, RefreshCw, Search, ShieldCheck, UserPlus, Users, X} from "lucide-react";
 import AdminInsights from "./AdminInsights.jsx";
 import {useStaffSession} from "./staffSession.js";
-import {AiTag, CategoryTag, ConfirmDialog, EmptyState, Metric, PendingNotice, PriorityBadge, SeverityBadge, SkeletonRows, StatusBadge} from "./components.jsx";
+import {AiTag, CategoryTag, ConfirmDialog, EmptyState, Metric, PriorityBadge, SeverityBadge, SkeletonRows, StatusBadge} from "./components.jsx";
 import {DEPARTMENTS, buildingOf, displayStatus, formatDate, formatDateTime, formatDuration, isOpen, priorityRank, responseTimes, severityOf, timeAgo} from "./ui.js";
 
 const STATUS_FILTERS = [["open", "All open"], ["Submitted", "Submitted"], ["Assigned", "Assigned"], ["In Progress", "In progress"], ["resolved", "Resolved"], ["all", "All statuses"]];
@@ -19,6 +19,29 @@ function priorityExplanation(p) {
   if (p.method === "random_forest" && p.rule_priority && p.rule_priority !== p.final) parts.push(`Keyword rules alone would have given ${p.rule_priority}.`);
   return parts.join(" ");
 }
+
+/** An unreviewed possible duplicate (feature 7). */
+const possibleDuplicate = issue => (issue.ai_analysis?.duplicates?.matches?.length || 0) > 0 && !issue.ai_analysis.duplicates.review;
+
+/** Similar open reports found when this report was submitted, with the staff review. */
+function DuplicatePanel({issue, s}) {
+  const d = issue.ai_analysis?.duplicates;
+  if (!d) return <p className="muted">Duplicate check: not run (this report was submitted before duplicate detection was added).</p>;
+  const review = d.review;
+  return <>
+    <h3 className="section-title">Duplicate check <AiTag/></h3>
+    {d.method === "unavailable" && <p className="muted">The similarity check could not run for this report.</p>}
+    {d.method !== "unavailable" && !d.matches?.length && <p className="muted">No similar open reports in the same department or building.</p>}
+    {d.matches?.length > 0 && <ul className="duplicate-list">{d.matches.map(m => (
+      <li key={m.issue_id}>
+        <div><strong>#{m.issue_id} {m.title}</strong><span>{m.reasons.map((r, k) => (k ? r.charAt(0).toLowerCase() + r.slice(1) : r)).join(", ")}.</span></div>
+        {!review && <button className="btn btn-secondary btn-sm" onClick={() => s.reviewDuplicateOf(issue.id, "duplicate", m.issue_id)}>Same problem as #{m.issue_id}</button>}
+      </li>))}</ul>}
+    {d.matches?.length > 0 && !review && <button className="btn btn-ghost btn-sm" onClick={() => s.reviewDuplicateOf(issue.id, "not_duplicate")}>Not a duplicate</button>}
+    {review && <p className="review-note">{review.decision === "duplicate" ? `Confirmed duplicate of #${review.duplicate_of}` : "Reviewed: not a duplicate"}, by {review.reviewed_by} on {formatDateTime(review.reviewed_at)}. The report stays open until someone resolves it.</p>}
+  </>;
+}
+
 
 function SignIn({s}) {
   const [email, setEmail] = useState(""), [password, setPassword] = useState(""), [bootstrapKey, setBootstrapKey] = useState(""), [fullName, setFullName] = useState("");
@@ -80,7 +103,7 @@ function TaskDrawer({issue, s, onClose, onResolve}) {
           <p className="prose">{priorityExplanation(ai.priority)}</p>
           {ai.priority.factors?.length > 0 && <ul className="reason-list">{ai.priority.factors.map(f => <li key={f}>{f}</li>)}</ul>}
         </>}
-        <PendingNotice title="Duplicate check">Similar-report detection (image and text similarity) is not implemented yet.</PendingNotice>
+        <DuplicatePanel issue={issue} s={s}/>
         <h3 className="section-title">Status history</h3>
         {!rows ? <div className="skeleton-line"/> : <>
           {times && (times.response || times.resolution) && <p className="response-times">{times.response && <span>Work started after <b>{times.response}</b></span>}{times.resolution && <span>Resolved after <b>{times.resolution}</b></span>}</p>}
@@ -130,7 +153,7 @@ function TaskList({s, scope, title, sub}) {
       <thead><tr><th scope="col">ID</th><th scope="col">Issue</th><th scope="col">Priority</th><th scope="col">Severity</th><th scope="col">Department</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
       <tbody>{tasks.map(i => <tr key={i.id} className={`edge-${(i.priority || "medium").toLowerCase()}`}>
         <td data-label="ID" className="cell-id">#{i.id}</td>
-        <td data-label="Issue"><div className="cell-title"><h3>{i.title}</h3><span className="cell-sub"><MapPin size={13} aria-hidden="true"/>{i.location}</span><CategoryTag category={i.category}/></div></td>
+        <td data-label="Issue"><div className="cell-title"><h3>{i.title}</h3>{possibleDuplicate(i) && <span className="badge badge-duplicate"><Copy size={12} aria-hidden="true"/>Possible duplicate</span>}<span className="cell-sub"><MapPin size={13} aria-hidden="true"/>{i.location}</span><CategoryTag category={i.category}/></div></td>
         <td data-label="Priority"><PriorityBadge priority={i.priority}/></td>
         <td data-label="Severity"><SeverityBadge severity={severityOf(i.risk_level)}/></td>
         <td data-label="Department">{i.department}</td>

@@ -61,6 +61,7 @@ function Submitted({issue, onTrack, onClose}) {
         {issue.location && <div><dt>Location</dt><dd>{issue.location}</dd></div>}
       </dl>
       {issue.ai_analysis?.routing_reason && <p className="ai-note">{issue.ai_analysis.routing_reason}</p>}
+      {issue.ai_analysis?.duplicates?.matches?.length > 0 && <p className="ai-note duplicate-note">A similar report is already open (#{issue.ai_analysis.duplicates.matches[0].issue_id}). Your report was still submitted. Staff will check whether it is the same problem.</p>}
       <div className="dialog-actions">
         <button type="button" className="btn btn-secondary" onClick={onClose}>Done</button>
         <button type="button" className="btn btn-primary" onClick={() => onTrack(issue.tracking_code)}><Search size={16}/>Track this report</button>

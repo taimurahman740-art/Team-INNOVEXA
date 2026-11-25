@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState} from "react";
 import {
   assignIssue, bootstrapStaffAdmin, changeStaffPassword, createStaffUser, getIssueHistory, getResponseTimes,
-  getStaffIssues, getStaffSetupStatus, getStaffUsers, loginStaff, resetStaffPassword, setStaffActive,
+  getStaffIssues, getStaffSetupStatus, reviewDuplicate, getStaffUsers, loginStaff, resetStaffPassword, setStaffActive,
 } from "./api.js";
 
 /**
@@ -75,6 +75,14 @@ export function useStaffSession({issues = [], onUpdate, enabled = true} = {}) {
     } catch (err) { setError(err.message || "Could not update report."); return false; }
   }
 
+  async function reviewDuplicateOf(id, decision, duplicateOf) {
+    try {
+      const item = await reviewDuplicate(id, decision, duplicateOf, token);
+      setStaffIssues(old => old.map(x => (x.id === id ? item : x)));
+      setSuccess(decision === "duplicate" ? `Report #${id} marked as a duplicate of #${duplicateOf}.` : `Report #${id} marked as not a duplicate.`);
+      setError("");
+    } catch (err) { setError(err.message || "Could not save the duplicate review."); }
+  }
   async function assign(id, value) {
     try {
       const item = await assignIssue(id, value ? Number(value) : null, token);
@@ -122,6 +130,6 @@ export function useStaffSession({issues = [], onUpdate, enabled = true} = {}) {
   return {
     setupAvailable, authReady, bootstrapMode, setBootstrapMode, token, user, staffIssues, staffUsers, timings, history,
     error, setError, success, setSuccess, busy,
-    signIn, signOut, refresh, changeStatus, assign, loadHistory, addStaff, updateAccountActive, resetPassword, updateOwnPassword,
+    signIn, signOut, refresh, changeStatus, assign, reviewDuplicateOf, loadHistory, addStaff, updateAccountActive, resetPassword, updateOwnPassword,
   };
 }

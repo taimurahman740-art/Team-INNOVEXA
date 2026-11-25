@@ -55,4 +55,5 @@ export const getIssueHistory = (id,token) => request(`/issues/${id}/history`,{to
 export const changeStaffPassword = (current_password,new_password,token) => request("/issues/staff/me/password",{method:"PATCH",token,body:JSON.stringify({current_password,new_password})});
 export const setStaffActive = (id,is_active,token) => request(`/issues/staff/users/${id}/active`,{method:"PATCH",token,body:JSON.stringify({is_active})});
 export const resetStaffPassword = (id,new_password,token) => request(`/issues/staff/users/${id}/reset-password`,{method:"POST",token,body:JSON.stringify({new_password})});
+export const reviewDuplicate = (id,decision,duplicate_of,token) => request(`/issues/${id}/duplicate-review`,{method:"PATCH",token,body:JSON.stringify({decision,duplicate_of:duplicate_of??null})});
 export const getResponseTimes = (token) => request("/issues/analytics/response-times",{token});

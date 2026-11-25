@@ -223,4 +223,20 @@ class IssueApiTests(unittest.TestCase):
         self.assertIn(p["method"], {"random_forest", "rules"})
         self.assertIn("rule_priority", p)
 
+    def test_possible_duplicate_is_flagged_not_rejected_and_can_be_reviewed(self):
+        first = self.client.post("/issues", json=self.payload(title="Water leaking from ceiling", description="Water is dripping from the ceiling in the library third floor", location="Library, Floor 3", building="Library", category="Plumbing")).json()
+        second = self.client.post("/issues", json=self.payload(title="Ceiling leak", description="Water drips from the ceiling near the library stairs on floor 3", location="Library, Floor 3", building="Library", category="Plumbing"))
+        self.assertEqual(second.status_code, 201, second.text)
+        matches = second.json()["ai_analysis"]["duplicates"]["matches"]
+        self.assertEqual(matches[0]["issue_id"], first["id"])
+        headers = self.staff_session()
+        r = self.client.patch(f"/issues/{second.json()['id']}/duplicate-review", json={"decision": "duplicate", "duplicate_of": first["id"]}, headers=headers)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["ai_analysis"]["duplicates"]["review"]["duplicate_of"], first["id"])
+        self.assertEqual(r.json()["status"], "Submitted")  # nothing is closed automatically
+
+    def test_duplicate_review_requires_staff(self):
+        issue = self.client.post("/issues", json=self.payload()).json()
+        self.assertEqual(self.client.patch(f"/issues/{issue['id']}/duplicate-review", json={"decision": "not_duplicate"}).status_code, 401)
+
 if __name__=="__main__": unittest.main()

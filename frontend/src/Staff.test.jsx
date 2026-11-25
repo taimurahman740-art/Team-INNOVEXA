@@ -12,6 +12,7 @@ vi.mock("./api.js",()=>({
   assignIssue:vi.fn(),getIssueHistory:vi.fn(),
   changeStaffPassword:vi.fn(),setStaffActive:vi.fn(),resetStaffPassword:vi.fn(),
   getResponseTimes:vi.fn(()=>Promise.resolve(null)),
+  reviewDuplicate:vi.fn(),
 }));
 afterEach(()=>{cleanup();vi.clearAllMocks();});
 

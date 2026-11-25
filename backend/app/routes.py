@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, timezone
 import binascii
 import hmac
 import os
@@ -13,11 +14,12 @@ from .models import Issue, IssueStatusHistory, StaffUser
 from .schemas import (
     IssueCreate, ImageClassificationRequest, IssueRead, IssuePublicRead,
     IssueStatusUpdate, IssueStatusHistoryRead, IssueTrackingRead,
-    IssueAssignmentUpdate, StaffLogin, StaffBootstrap, StaffUserCreate,
+    IssueAssignmentUpdate, DuplicateReview, StaffLogin, StaffBootstrap, StaffUserCreate,
     StaffUserRead, StaffTokenRead, StaffSetupStatus,
 )
 from .image_recognition import classify_campus_image
 from .priority_model import predict_priority
+from .duplicates import OPEN_STATUSES, find_possible_duplicates
 from .analytics import response_time_stats
 from .services import assess_safety_risk, choose_category, classify_issue, merge_image_hazard_risk, routing_reason, suggest_department, suggest_priority
 
@@ -248,12 +250,46 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
         "routing_reason": routing_reason(category, source),
         **fusion,
     }
+    department = suggest_department(category)
+    ai_analysis["duplicates"] = _duplicate_check(db, {"title": title, "description": description, "department": department, "building": (payload.building or "").strip() or None, "image_data": payload.image_data})
     if analysis:
         ai_analysis["image"] = {k: analysis.get(k) for k in ("category", "score", "category_scores", "hazard", "model")}
-    issue = Issue(title=title, description=description, location=payload.location.strip(), building=(payload.building or "").strip() or None, equipment=(payload.equipment or "").strip() or None, category=category, priority=final_priority, status="Submitted", department=suggest_department(category), image_data=payload.image_data, classification_confidence=round(confidence, 4), risk_score=risk_score, risk_level=risk_level, risk_reasons=risk_reasons, ai_analysis=ai_analysis)
+    issue = Issue(title=title, description=description, location=payload.location.strip(), building=(payload.building or "").strip() or None, equipment=(payload.equipment or "").strip() or None, category=category, priority=final_priority, status="Submitted", department=department, image_data=payload.image_data, classification_confidence=round(confidence, 4), risk_score=risk_score, risk_level=risk_level, risk_reasons=risk_reasons, ai_analysis=ai_analysis)
     db.add(issue)
     db.flush()
     db.add(IssueStatusHistory(issue_id=issue.id, old_status=None, new_status="Submitted", changed_by="system"))
+    db.commit()
+    db.refresh(issue)
+    return issue
+
+
+def _duplicate_check(db: Session, new: dict) -> dict:
+    """Flag similar open reports for staff review. Never blocks or rejects the new report."""
+    try:
+        recent = db.scalars(select(Issue).where(Issue.status.in_(OPEN_STATUSES)).order_by(Issue.created_at.desc()).limit(50)).all()
+        candidates = [{"id": i.id, "title": i.title, "description": i.description, "department": i.department, "building": i.building, "image_data": i.image_data, "status": i.status} for i in recent]
+        return {"method": "tfidf_text_cosine+image_feature_cosine", "matches": find_possible_duplicates(new, candidates), "review": None}
+    except Exception as exc:  # the check is advisory; a failure must not lose the report
+        return {"method": "unavailable", "matches": [], "review": None, "error": type(exc).__name__}
+
+
+@router.patch("/{issue_id}/duplicate-review", response_model=IssueRead)
+def review_duplicate(issue_id: int, payload: DuplicateReview, user: StaffUser = Depends(get_current_staff), db: Session = Depends(get_db)):
+    """Staff confirm or dismiss a possible duplicate. Nothing is merged or closed automatically."""
+    issue = db.get(Issue, issue_id)
+    if issue is None:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    if not _can_work(issue, user):
+        raise HTTPException(status_code=403, detail="This report is outside your assigned work.")
+    if payload.decision == "duplicate":
+        if payload.duplicate_of is None or payload.duplicate_of == issue.id or db.get(Issue, payload.duplicate_of) is None:
+            raise HTTPException(status_code=422, detail="Choose the existing report this one duplicates.")
+    analysis = dict(issue.ai_analysis or {})
+    duplicates = dict(analysis.get("duplicates") or {"method": "manual", "matches": []})
+    duplicates["review"] = {"decision": payload.decision, "duplicate_of": payload.duplicate_of if payload.decision == "duplicate" else None,
+                            "reviewed_by": user.email[:80], "reviewed_at": datetime.now(timezone.utc).isoformat()}
+    analysis["duplicates"] = duplicates
+    issue.ai_analysis = analysis  # reassign so SQLAlchemy saves the JSON change
     db.commit()
     db.refresh(issue)
     return issue

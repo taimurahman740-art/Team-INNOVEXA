@@ -492,3 +492,13 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);bo
 }
 /* Narrow screens: label every third week so dates never overlap (values stay in the tooltip and aria-label). */
 @media (max-width:640px){.column:not(:nth-child(3n+1)) .column-label{visibility:hidden}}
+
+/* Duplicate detection (feature 7) */
+.badge-duplicate{background:var(--warning-bg);color:var(--warning-text);border-color:#FDE68A;height:22px;font-size:12px;align-self:flex-start}
+.duplicate-list{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:8px}
+.duplicate-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid #FDE68A;background:var(--warning-bg);border-radius:10px}
+.duplicate-list strong{display:block;font-size:14px}
+.duplicate-list span{font-size:13px;color:var(--text-2)}
+.review-note{font-size:13.5px;color:var(--text-2);padding:10px 12px;border-radius:10px;background:var(--subtle)}
+.duplicate-note{background:var(--warning-bg);color:var(--warning-text)}
+@media(max-width:640px){.duplicate-list li{flex-direction:column;align-items:flex-start}}

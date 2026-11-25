@@ -15,7 +15,7 @@ const FEATURES = [
   ["Automatic department routing", "live", "Category to department, with reason shown"],
   ["Machine-learning priority prediction", "partial", "Random Forest baseline with a safety floor; resolution-time feature pending"],
   ["Computer-vision hazard detection and severity", "live", "Zero-shot CLIP, confirmed by staff"],
-  ["Duplicate-ticket detection", "pending", "Image and text similarity not built yet"],
+  ["Duplicate-ticket detection", "live", "Text and photo similarity, flagged for staff review"],
   ["Multimodal vision and text classification", "live", "Photo and description combined; photo-only reports"],
 ];
 const FEATURE_LABEL = {live: "Available", partial: "Partial", pending: "Pending"};
