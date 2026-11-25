@@ -1,8 +1,9 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Activity, AlertTriangle, ChartColumn, Bell, ClipboardList, FileText, Inbox, KeyRound, LayoutDashboard, ListChecks, LogIn, LogOut, Menu, Plus, RefreshCw, Repeat, Search, ShieldAlert, ShieldCheck, Siren, UserCheck, Users, WifiOff, X} from "lucide-react";
+import {Activity, AlertTriangle, Info, ChartColumn, Bell, ClipboardList, FileText, Inbox, KeyRound, LayoutDashboard, ListChecks, LogIn, LogOut, Menu, Plus, RefreshCw, Repeat, Search, ShieldAlert, ShieldCheck, Siren, UserCheck, Users, WifiOff, X} from "lucide-react";
 import {getIssueTracking, getIssues, patchStatus} from "./api.js";
 import Staff from "./Staff.jsx";
 import TrackIssue from "./TrackIssue.jsx";
+import SystemOverview from "./SystemOverview.jsx";
 import ReportDialog from "./ReportDialog.jsx";
 import {MyReports, Notifications} from "./MyReports.jsx";
 import {useStaffSession} from "./staffSession.js";
@@ -22,6 +23,7 @@ const VIEWS = {
  myreports: ["My reports", "Follow the reports you submitted from this device."],
  tracking: ["Track a report", "Check progress with the tracking code you received."],
  notifications: ["Notifications", "Updates on your reports."],
+ system: ["System overview", "Architecture, the eight approved features and AI results."],
  "staff-signin": ["Staff sign in", "Maintenance staff and administrators.", "dashboard"],
  "staff-dashboard": ["Staff dashboard", "Your department's work at a glance.", "dashboard"],
  "staff-assigned": ["Assigned tasks", "Reports assigned to you.", "assigned"],
@@ -163,6 +165,7 @@ export default function App() {
      {navItem("staff-assigned",UserCheck,"Assigned tasks")}
      {navItem("staff-tasks",ListChecks,isAdmin?"Department queue":"All issues")}
     </div>:<div className="nav-group"><span className="nav-heading">Staff</span>{navItem("staff-signin",LogIn,"Staff sign in")}</div>}
+    <div className="nav-group"><span className="nav-heading">About</span>{navItem("system",Info,"System overview")}</div>
     {isAdmin&&<div className="nav-group"><span className="nav-heading">Administration</span>
      {navItem("admin-overview",ShieldCheck,"Admin overview")}
      {navItem("admin-reports",Inbox,"All reports")}
@@ -216,6 +219,7 @@ export default function App() {
    :view==="tracking"?<TrackIssue initialCode={trackCode}/>
    :view==="myreports"?<MyReports reports={mine} loading={mineLoading&&!mine.some(r=>r.last_status)} onRefresh={refreshMine} onTrack={track} onReport={()=>setModal(true)}/>
    :view==="notifications"?<Notifications reports={mine} onMarkRead={markRead} onTrack={track}/>
+   :view==="system"?<SystemOverview onOpen={v=>{if(v==="report"){setModal(true);return;}const needsStaff=v.startsWith("staff-")||v.startsWith("admin-");go(needsStaff&&!staffUser?"staff-signin":needsStaff&&v.startsWith("admin-")&&!isAdmin?"staff-dashboard":v);}}/>
    :<>
     <section className="welcome">
      <div><h2>Spotted something broken or unsafe?</h2><p>Report it with a photo or a short description. INNOVEXA routes it to the right maintenance team, and you can follow it with a tracking code.</p></div>
