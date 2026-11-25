@@ -39,6 +39,9 @@ class Issue(Base):
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default="Low")
     risk_reasons: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     tracking_code: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True, default=generate_tracking_code)
+    building: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    # Image and fusion details: which model, scores, hazard, routing reason. Advisory only.
+    ai_analysis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 

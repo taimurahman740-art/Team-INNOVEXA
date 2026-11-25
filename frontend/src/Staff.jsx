@@ -3,7 +3,7 @@ import {LockKeyhole,LogOut,ShieldCheck,UserPlus,Wrench,MapPin} from "lucide-reac
 import AdminInsights from "./AdminInsights.jsx";
 import {assignIssue,bootstrapStaffAdmin,createStaffUser,getIssueHistory,getStaffIssues,getStaffSetupStatus,getStaffUsers,loginStaff,changeStaffPassword,setStaffActive,resetStaffPassword} from "./api.js";
 
-const departments=["Electrical Maintenance","Plumbing Maintenance","Cleaning Services","Campus Safety","Facilities Maintenance","Campus Administration"];
+const departments=["Electrical Maintenance","Plumbing Maintenance","Cleaning Services","Campus Safety","Facilities Maintenance","HVAC Maintenance","IT Infrastructure","Campus Administration"];
 const rank={high:0,medium:1,low:2};
 const priorityRank=p=>rank[(p||"").toLowerCase()]??3;
 
@@ -117,6 +117,7 @@ export default function Staff({issues,live,onUpdate}) {
     <div className="issue-list">{tasks.map(i=><article className="issue-row" key={i.id}>
       <div className="issue-main"><div className="issue-title-line"><h3>{i.title}</h3><span className={`priority priority-${(i.priority||"Medium").toLowerCase()}`}>{i.priority} priority</span><span className={`status status-${(i.status||"").toLowerCase().replaceAll(" ","-")}`}>{i.status}</span></div>
         <p>{i.description}</p><div className="ai-note">Safety triage: {i.risk_level||"Low"} ({i.risk_score??0}/10) {i.risk_reasons?.join("; ")}</div>
+        {i.ai_analysis?.routing_reason&&<div className="ai-note">{i.ai_analysis.routing_reason}{i.ai_analysis.image_only?" Photo-only report: text was suggested from the image.":""}{i.ai_analysis.image?.hazard?` Photo hazard to confirm: ${i.ai_analysis.image.hazard.label}.`:""}</div>}
         <div className="meta"><span><Wrench size={14}/>{i.department}</span><span><MapPin size={14}/>{i.location}</span><span>{i.assigned_staff_id?"Assigned staff #"+i.assigned_staff_id:"Unassigned"}</span></div>
         {i.image_data&&<img className="issue-photo" src={i.image_data} alt="Report attachment"/>}
         <div className="toolbar"><button className="btn btn-light" disabled={historyLoading===i.id} onClick={()=>toggleHistory(i.id)}>{historyLoading===i.id?"Loading…":history[i.id]?"Hide history":"View history"}</button>

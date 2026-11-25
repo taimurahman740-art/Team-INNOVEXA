@@ -17,7 +17,7 @@ from .schemas import (
     StaffUserRead, StaffTokenRead, StaffSetupStatus,
 )
 from .image_recognition import classify_campus_image
-from .services import assess_safety_risk, classify_issue, suggest_category, suggest_department, suggest_priority
+from .services import assess_safety_risk, choose_category, classify_issue, merge_image_hazard_risk, routing_reason, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 IMAGE_PATTERN = re.compile(r"^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$")
@@ -197,17 +197,40 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     if payload.image_data and not validate_image_data(payload.image_data):
         raise HTTPException(status_code=422, detail="Image must be PNG, JPEG or WEBP.")
 
-    _, confidence = classify_issue(payload.title, payload.description)
-    category = (
-        payload.category
-        if payload.category != "Other"
-        else suggest_category(payload.title, payload.description)
-    )
+    analysis = payload.image_analysis.model_dump() if (payload.image_data and payload.image_analysis) else None
+    user_title = (payload.title or "").strip()
+    user_description = (payload.description or "").strip()
+    has_user_text = len(user_title) >= 3 and len(user_description) >= 5
+    title, description = user_title, user_description
+    if not has_user_text:
+        # Image-only report: fill the gaps from the photo suggestion, or ask for more.
+        if analysis is None or analysis.get("needs_more_info"):
+            raise HTTPException(status_code=422, detail="The photo alone is not enough to identify the problem. Please add a short title and description.")
+        if len(title) < 3:
+            title = (analysis.get("suggested_title") or f"{analysis['category']} issue (photo report)")[:120]
+        if len(description) < 5:
+            description = analysis.get("suggested_description") or "Photo report submitted without a description."
 
-    risk_score, risk_level, risk_reasons = assess_safety_risk(payload.title, payload.description)
-    suggested_priority = suggest_priority(payload.title, payload.description)
+    _, text_confidence = classify_issue(title, description)
+    if payload.category not in (None, "Other"):
+        category, confidence, source, fusion = payload.category, text_confidence, "user", {}
+    else:
+        category, confidence, source, fusion = choose_category(title, description, has_user_text, analysis)
+
+    # Keyword risk uses only what the reporter wrote, so suggested text cannot count twice.
+    risk_score, _, risk_reasons = assess_safety_risk(user_title, user_description)
+    risk_score, risk_level, risk_reasons = merge_image_hazard_risk(risk_score, risk_reasons, analysis)
+    suggested_priority = suggest_priority(user_title, user_description) if has_user_text else ("High" if risk_score >= 5 else "Medium")
     final_priority = "High" if risk_score >= 5 else (payload.priority or suggested_priority)
-    issue = Issue(title=payload.title.strip(), description=payload.description.strip(), location=payload.location.strip(), category=category, priority=final_priority, status="Submitted", department=suggest_department(category), image_data=payload.image_data, classification_confidence=round(confidence,4), risk_score=risk_score, risk_level=risk_level, risk_reasons=risk_reasons)
+    ai_analysis = {
+        "image_only": not has_user_text,
+        "category_source": source,
+        "routing_reason": routing_reason(category, source),
+        **fusion,
+    }
+    if analysis:
+        ai_analysis["image"] = {k: analysis.get(k) for k in ("category", "score", "category_scores", "hazard", "model")}
+    issue = Issue(title=title, description=description, location=payload.location.strip(), building=(payload.building or "").strip() or None, category=category, priority=final_priority, status="Submitted", department=suggest_department(category), image_data=payload.image_data, classification_confidence=round(confidence, 4), risk_score=risk_score, risk_level=risk_level, risk_reasons=risk_reasons, ai_analysis=ai_analysis)
     db.add(issue)
     db.flush()
     db.add(IssueStatusHistory(issue_id=issue.id, old_status=None, new_status="Submitted", changed_by="system"))

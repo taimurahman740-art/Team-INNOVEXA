@@ -26,12 +26,12 @@ async def lifespan(app: FastAPI):
         if "assigned_staff_id" not in columns:
             connection.execute(text("ALTER TABLE issues ADD COLUMN assigned_staff_id INTEGER"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_issues_assigned_staff_id ON issues (assigned_staff_id)"))
-        for name, definition in [("image_data","TEXT"),("classification_confidence","FLOAT"),("risk_score","INTEGER NOT NULL DEFAULT 0"),("risk_level","VARCHAR(20) NOT NULL DEFAULT 'Low'"),("risk_reasons","JSON NOT NULL DEFAULT '[]'")]:
+        for name, definition in [("image_data","TEXT"),("classification_confidence","FLOAT"),("risk_score","INTEGER NOT NULL DEFAULT 0"),("risk_level","VARCHAR(20) NOT NULL DEFAULT 'Low'"),("risk_reasons","JSON NOT NULL DEFAULT '[]'"),("building","VARCHAR(80)"),("ai_analysis","JSON")]:
             if name not in columns:
                 connection.execute(text(f"ALTER TABLE issues ADD COLUMN {name} {definition}"))
     yield
 
-app = FastAPI(title="INNOVEXA Smart Campus API", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="INNOVEXA Smart Campus API", version="0.4.0", lifespan=lifespan)
 origins = [x.strip() for x in os.getenv("FRONTEND_ORIGINS", "*").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False, allow_methods=["GET","POST","PATCH","OPTIONS"], allow_headers=["Content-Type","Authorization"])
 app.include_router(router)

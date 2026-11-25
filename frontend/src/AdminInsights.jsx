@@ -1,7 +1,7 @@
 import {useMemo} from "react";
 
 const categories = ["Electrical", "Plumbing", "Cleaning", "Safety", "Facility", "Other"];
-const departments = ["Electrical Maintenance", "Plumbing Maintenance", "Cleaning Services", "Campus Safety", "Facilities Maintenance", "Campus Administration"];
+const departments = ["Electrical Maintenance", "Plumbing Maintenance", "Cleaning Services", "Campus Safety", "Facilities Maintenance", "HVAC Maintenance", "IT Infrastructure", "Campus Administration"];
 const isOpen = (i) => !["resolved", "closed"].includes((i.status || "").toLowerCase());
 
 function Bars({rows}) {

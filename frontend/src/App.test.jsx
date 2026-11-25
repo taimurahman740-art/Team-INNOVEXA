@@ -28,10 +28,35 @@ describe("student issue interface", () => {
   await user.click(await screen.findByRole("button",{name:/report issue/i}));
   await user.type(screen.getByLabelText("Issue title"),"Broken projector");
   await user.type(screen.getByLabelText("Description"),"The projector does not turn on.");
-  await user.type(screen.getByLabelText("Location"),"Lecture Hall 3");
+  await user.type(screen.getByLabelText("Building"),"Lecture Hall 3");
   await user.click(screen.getByRole("button",{name:"Submit report"}));
   expect(await screen.findByText("Broken projector")).toBeInTheDocument();
-  expect(api.postIssue).toHaveBeenCalledWith(expect.objectContaining({title:"Broken projector",description:"The projector does not turn on.",location:"Lecture Hall 3"}));
+  expect(api.postIssue).toHaveBeenCalledWith(expect.objectContaining({title:"Broken projector",description:"The projector does not turn on.",location:"Lecture Hall 3",building:"Lecture Hall 3",category:null}));
+ });
+ it("supports a photo-only report using the photo suggestion", async () => {
+  api.getIssues.mockResolvedValue([]);
+  api.classifyImage.mockResolvedValue({category:"HVAC",score:0.82,needs_more_info:false,hazard:null,suggested_title:"Heating or air-conditioning problem",suggested_description:"Photo report. The image appears to show a HVAC issue (82% match).",category_scores:{HVAC:0.82}});
+  api.postIssue.mockResolvedValue({...records[0],id:4,title:"Heating or air-conditioning problem",category:"HVAC"});
+  const user=userEvent.setup(); render(<App/>);
+  await user.click(await screen.findByRole("button",{name:/report issue/i}));
+  await user.type(screen.getByLabelText("Building"),"Library");
+  await user.upload(screen.getByLabelText(/attach a photo/i), new File([new Uint8Array([137,80,78,71,13,10,26,10])],"ac.png",{type:"image/png"}));
+  expect(await screen.findByText(/AI suggests HVAC/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Issue title")).toHaveValue("Heating or air-conditioning problem");
+  expect(screen.getByLabelText("Issue title")).not.toBeRequired();
+  await user.click(screen.getByRole("button",{name:"Submit report"}));
+  expect(await screen.findByText("Heating or air-conditioning problem")).toBeInTheDocument();
+  expect(api.postIssue).toHaveBeenCalledWith(expect.objectContaining({building:"Library",location:"Library",image_analysis:expect.objectContaining({category:"HVAC"})}));
+ });
+ it("asks for a description when the photo is unclear", async () => {
+  api.getIssues.mockResolvedValue([]);
+  api.classifyImage.mockResolvedValue({category:"Other",score:0.2,needs_more_info:true,message:"The photo is not clear enough to identify the problem. Please add a short title and description."});
+  const user=userEvent.setup(); render(<App/>);
+  await user.click(await screen.findByRole("button",{name:/report issue/i}));
+  await user.upload(screen.getByLabelText(/attach a photo/i), new File([new Uint8Array([137,80,78,71,13,10,26,10])],"blur.png",{type:"image/png"}));
+  expect(await screen.findByText(/not clear enough/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Issue title")).toBeRequired();
+  expect(screen.getByLabelText("Issue title")).toHaveValue("");
  });
  it("shows an error when report submission fails", async () => {
   api.getIssues.mockResolvedValue([]); api.postIssue.mockRejectedValue(new Error("offline"));
@@ -39,7 +64,7 @@ describe("student issue interface", () => {
   await user.click(await screen.findByRole("button",{name:/report issue/i}));
   await user.type(screen.getByLabelText("Issue title"),"Broken projector");
   await user.type(screen.getByLabelText("Description"),"The projector does not turn on.");
-  await user.type(screen.getByLabelText("Location"),"Lecture Hall 3");
+  await user.type(screen.getByLabelText("Building"),"Lecture Hall 3");
   await user.click(screen.getByRole("button",{name:"Submit report"}));
   expect(await screen.findByRole("alert")).toHaveTextContent("Could not save");
  });

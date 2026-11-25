@@ -144,4 +144,55 @@ class IssueApiTests(unittest.TestCase):
         self.assertIn("choose a category manually", response.json()["detail"])
         self.assertNotIn(secret, response.text)
 
+    PNG = "data:image/png;base64,iVBORw0KGgo="
+
+    def analysis(self, **overrides):
+        data = {"category": "HVAC", "score": 0.82, "category_scores": {"HVAC": 0.82, "Facility": 0.1, "Other": 0.08},
+                "hazard": None, "needs_more_info": False, "suggested_title": "Heating or air-conditioning problem",
+                "suggested_description": "Photo report. The image appears to show a HVAC issue (82% match).", "model": "test/clip"}
+        data.update(overrides); return data
+
+    def test_image_only_report_uses_photo_suggestion(self):
+        r = self.client.post("/issues", json={"location": "Library 2F", "building": "Library", "image_data": self.PNG, "image_analysis": self.analysis()})
+        self.assertEqual(r.status_code, 201, r.text)
+        body = r.json()
+        self.assertEqual(body["title"], "Heating or air-conditioning problem")
+        self.assertEqual(body["category"], "HVAC")
+        self.assertEqual(body["department"], "HVAC Maintenance")
+        self.assertEqual(body["building"], "Library")
+        self.assertTrue(body["ai_analysis"]["image_only"])
+        self.assertEqual(body["ai_analysis"]["category_source"], "image")
+
+    def test_image_only_report_asks_for_text_when_photo_is_unclear(self):
+        r = self.client.post("/issues", json={"location": "Library 2F", "image_data": self.PNG, "image_analysis": self.analysis(needs_more_info=True, suggested_title=None)})
+        self.assertEqual(r.status_code, 422)
+        self.assertIn("add a short title and description", r.json()["detail"])
+
+    def test_image_only_report_without_analysis_is_rejected(self):
+        r = self.client.post("/issues", json={"location": "Library 2F", "image_data": self.PNG})
+        self.assertEqual(r.status_code, 422)
+
+    def test_report_without_photo_still_requires_text(self):
+        r = self.client.post("/issues", json={"location": "Library 2F", "title": "", "description": ""})
+        self.assertEqual(r.status_code, 422)
+
+    def test_photo_hazard_raises_risk_and_priority(self):
+        hazard = {"key": "exposed_wiring", "label": "Exposed electrical wiring", "score": 0.8, "risk_points": 5}
+        r = self.client.post("/issues", json=self.payload(title="Wall socket", description="Please check this socket.", priority="Low", image_data=self.PNG, image_analysis=self.analysis(category="Electrical", category_scores={"Electrical": 0.9}, hazard=hazard)))
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(r.json()["risk_level"], "High")
+        self.assertEqual(r.json()["priority"], "High")
+        self.assertTrue(any("staff must confirm" in reason for reason in r.json()["risk_reasons"]))
+
+    def test_photo_and_text_are_combined(self):
+        r = self.client.post("/issues", json=self.payload(title="Classroom problem", description="Something is wrong in this classroom.", image_data=self.PNG, image_analysis=self.analysis(category="IT", score=0.9, category_scores={"IT": 0.9, "Other": 0.1})))
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(r.json()["ai_analysis"]["category_source"], "image+text")
+        self.assertEqual(r.json()["department"], "IT Infrastructure")
+
+    def test_reporter_category_choice_is_kept(self):
+        r = self.client.post("/issues", json=self.payload(category="Plumbing", image_data=self.PNG, image_analysis=self.analysis()))
+        self.assertEqual(r.json()["category"], "Plumbing")
+        self.assertEqual(r.json()["ai_analysis"]["category_source"], "user")
+
 if __name__=="__main__": unittest.main()

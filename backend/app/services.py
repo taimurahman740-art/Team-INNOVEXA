@@ -8,7 +8,7 @@ campus-wide sample. Predictions must be reviewed by campus staff.
 import csv
 import re
 from collections import Counter, defaultdict
-from math import log
+from math import exp, log
 from pathlib import Path
 
 STARTER_TRAINING_EXAMPLES = [
@@ -29,14 +29,24 @@ STARTER_TRAINING_EXAMPLES = [
     ("Safety", "smoke fire burning smell emergency hazard"),
     ("Safety", "loose handrail dangerous stairs"),
     ("Safety", "exposed dangerous object may injure students"),
-    ("Facility", "air conditioner is not working classroom hot"),
     ("Facility", "broken desk chair door window ceiling"),
     ("Facility", "damaged classroom furniture and projector"),
     ("Facility", "elevator lift is not working"),
     ("Facility", "roof is damaged and water dripping"),
     ("Other", "lost property student card found item"),
     ("Other", "question about campus service or administration"),
-    ("Other", "internet wifi connection is unavailable"),
+    ("HVAC", "air conditioner is not working classroom hot"),
+    ("HVAC", "heating radiator boiler cold freezing winter heat"),
+    ("HVAC", "ventilation fan exhaust stuffy humid no fresh air"),
+    ("HVAC", "aircon air conditioning unit compressor noisy cooling"),
+    ("HVAC", "heater thermostat temperature too hot too cold"),
+    ("HVAC", "air vent duct filter blowing hot air conditioner remote"),
+    ("IT", "internet wifi connection is unavailable"),
+    ("IT", "computer pc laptop software won't boot"),
+    ("IT", "network lan ethernet port internet cable router"),
+    ("IT", "printer scanner offline cannot print toner"),
+    ("IT", "monitor screen keyboard mouse computer lab"),
+    ("IT", "wireless network wi fi login server account down"),
 ]
 
 DATASET_PATH = Path(__file__).resolve().parents[1] / "data" / "tongmyong_sample_issues.csv"
@@ -57,8 +67,16 @@ def load_tongmyong_training_examples() -> list[tuple[str, str]]:
 # examples as well as the starter examples. Synthetic evaluation rows are excluded.
 TRAINING_EXAMPLES = STARTER_TRAINING_EXAMPLES + load_tongmyong_training_examples()
 
+# Filler words carry no category information but bias Naive Bayes toward classes
+# whose few examples happen to use them (e.g. "does not turn on" in AC reports).
+STOPWORDS = frozenset(
+    "a an the is are was were be been am it its this that these those there here of in on at to "
+    "for from by with and or but as do does did not no so very when while after before near "
+    "has have had needs need needed please some any".split()
+)
+
 def _tokens(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", text.lower())
+    return [w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOPWORDS]
 
 class NaiveBayesIssueClassifier:
     """Multinomial Naive Bayes text classifier trained from labelled examples."""
@@ -88,25 +106,44 @@ class NaiveBayesIssueClassifier:
                 score += log((self.word_counts[label][word] + 1) / denom)
             scores[label] = score
         peak = max(scores.values())
-        exp_scores = {k: __import__("math").exp(v - peak) for k, v in scores.items()}
+        exp_scores = {k: exp(v - peak) for k, v in scores.items()}
         total = sum(exp_scores.values())
         label = max(scores, key=scores.get)
         return label, exp_scores[label] / total
+
+    def predict_proba(self, text: str) -> dict[str, float]:
+        """Return a normalised probability for every known category."""
+        words = _tokens(text)
+        if not words or not self.total_docs:
+            return {}
+        scores = {}
+        vocab_size = max(len(self.vocabulary), 1)
+        for label, docs in self.class_docs.items():
+            score = log(docs / self.total_docs)
+            denom = self.total_words[label] + vocab_size
+            for word in words:
+                score += log((self.word_counts[label][word] + 1) / denom)
+            scores[label] = score
+        peak = max(scores.values())
+        exp_scores = {k: exp(v - peak) for k, v in scores.items()}
+        total = sum(exp_scores.values())
+        return {k: v / total for k, v in exp_scores.items()}
 
 _classifier = NaiveBayesIssueClassifier()
 
 def classify_issue(title: str, description: str) -> tuple[str, float]:
     return _classifier.predict(f"{title} {description}")
 
+SAFETY_EMERGENCY_REASONS = {
+    "Possible fire, smoke, gas or explosion",
+    "Fire protection or emergency equipment unavailable",
+}
+
 def suggest_category(title: str, description: str) -> str:
     # Route confirmed fire/smoke/gas emergency signals to Campus Safety even
     # when the Naive Bayes model is distracted by a location such as "electrical room".
     risk_score, _, risk_reasons = assess_safety_risk(title, description)
-    safety_emergency_reasons = {
-        "Possible fire, smoke, gas or explosion",
-        "Fire protection or emergency equipment unavailable",
-    }
-    if risk_score >= 5 and safety_emergency_reasons.intersection(risk_reasons):
+    if risk_score >= 5 and SAFETY_EMERGENCY_REASONS.intersection(risk_reasons):
         return "Safety"
 
     category, confidence = classify_issue(title, description)
@@ -189,5 +226,76 @@ def suggest_department(category: str) -> str:
     return {
         "Electrical": "Electrical Maintenance", "Plumbing": "Plumbing Maintenance",
         "Cleaning": "Cleaning Services", "Safety": "Campus Safety",
-        "Facility": "Facilities Maintenance", "Other": "Campus Administration",
+        "Facility": "Facilities Maintenance", "HVAC": "HVAC Maintenance",
+        "IT": "IT Infrastructure", "Other": "Campus Administration",
     }.get(category, "Campus Administration")
+
+
+def routing_reason(category: str, source: str) -> str:
+    """Plain-language explanation shown to staff and students."""
+    origin = {
+        "user": "chosen by the reporter",
+        "safety_override": "safety keywords (fire, smoke or gas) override the model",
+        "text": "predicted from the written description",
+        "image": "predicted from the photo",
+        "image+text": "predicted from the photo and the description together",
+        "low_confidence": "the models were not confident, so administration will triage it",
+    }.get(source, source)
+    return f"Routed to {suggest_department(category)}: category {category} {origin}."
+
+
+CATEGORY_CONFIDENCE_THRESHOLD = 0.30
+IMAGE_WEIGHT = 0.5
+
+
+def choose_category(title: str, description: str, has_user_text: bool, image_analysis: dict | None) -> tuple[str, float, str, dict]:
+    """Pick a category from text, photo or both (multimodal late fusion).
+
+    Text probabilities come from the Naive Bayes model, photo probabilities from
+    zero-shot CLIP. They are averaged (IMAGE_WEIGHT for the photo). The fire/smoke/gas
+    safety override still wins. Returns (category, confidence, source, details).
+    """
+    details: dict = {}
+    if has_user_text:
+        risk_score, _, risk_reasons = assess_safety_risk(title, description)
+        if risk_score >= 5 and SAFETY_EMERGENCY_REASONS.intersection(risk_reasons):
+            return "Safety", 1.0, "safety_override", details
+    text_probs = _classifier.predict_proba(f"{title} {description}") if has_user_text else {}
+    image_probs = {}
+    if image_analysis and not image_analysis.get("needs_more_info"):
+        image_probs = dict(image_analysis.get("category_scores") or {})
+        if not image_probs and image_analysis.get("category"):
+            image_probs = {image_analysis["category"]: float(image_analysis.get("score") or 0.0)}
+    if text_probs:
+        details["text_category"] = max(text_probs, key=text_probs.get)
+        details["text_confidence"] = round(text_probs[details["text_category"]], 4)
+    if image_probs:
+        details["image_category"] = max(image_probs, key=image_probs.get)
+        details["image_confidence"] = round(image_probs[details["image_category"]], 4)
+
+    if text_probs and image_probs:
+        labels = set(text_probs) | set(image_probs)
+        fused = {c: (1 - IMAGE_WEIGHT) * text_probs.get(c, 0.0) + IMAGE_WEIGHT * image_probs.get(c, 0.0) for c in labels}
+        source = "image+text"
+    elif image_probs:
+        fused, source = image_probs, "image"
+    elif text_probs:
+        fused, source = text_probs, "text"
+    else:
+        return "Other", 0.0, "low_confidence", details
+    category = max(fused, key=fused.get)
+    confidence = fused[category]
+    if confidence < CATEGORY_CONFIDENCE_THRESHOLD:
+        return "Other", round(confidence, 4), "low_confidence", details
+    return category, round(confidence, 4), source, details
+
+
+def merge_image_hazard_risk(score: int, reasons: list[str], image_analysis: dict | None) -> tuple[int, str, list[str]]:
+    """Add a photo hazard (if any) to the keyword risk score. Never lowers risk."""
+    reasons = list(reasons)
+    hazard = (image_analysis or {}).get("hazard")
+    if hazard and hazard.get("risk_points"):
+        score = min(10, score + int(hazard["risk_points"]))
+        reasons.append(f"Photo may show {hazard['label'].lower()} (AI {round(float(hazard['score']) * 100)}% match, staff must confirm)")
+    level = "High" if score >= 5 else "Moderate" if score >= 2 else "Low"
+    return score, level, reasons
