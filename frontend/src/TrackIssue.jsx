@@ -13,8 +13,8 @@ export default function TrackIssue({initialCode=""}) {
   setBusy(true);setError("");setResult(null);
   try{setResult(await getIssueTracking(normalized));}
   catch(err){setError(err.message||"Could not find this report. Check the tracking code and try again.");}
-  finally{setBusy(false);}
- }
+  finally{setBusy(false);}}
+ 
  useEffect(()=>{if(initialCode){setCode(initialCode);lookup(initialCode);}},[initialCode]);
  return <section className="tracking-panel">
   <div className="reports-head"><div><h2>Track your campus report</h2><p>Enter the unique code provided when you submitted your report.</p></div><Clock3 size={22} color="#39805f"/></div>
