@@ -35,7 +35,8 @@ describe("individual staff task centre",()=>{
     expect(await screen.findByText("Campus Technician")).toBeInTheDocument();
     expect(screen.getByRole("button",{name:"Start work"})).toBeEnabled();
     await user.click(screen.getByRole("button",{name:"Start work"}));
-    expect(onUpdate).toHaveBeenCalledWith(42,"In Progress","test-session-token");
+    // The 4th argument is the optional resolution note; starting work sends none.
+    expect(onUpdate).toHaveBeenCalledWith(42,"In Progress","test-session-token",undefined);
   });
 
   it("allows administrators to create staff and assign a department task",async()=>{
