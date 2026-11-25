@@ -215,4 +215,12 @@ class IssueApiTests(unittest.TestCase):
         self.assertEqual(r.json()["resolution_note"], "Replaced the ballast.")
         self.assertEqual(r.json()["status"], "Resolved")
 
+    def test_priority_prediction_is_stored_with_report(self):
+        r = self.client.post("/issues", json=self.payload(title="Blocked sink", description="The sink is blocked and water drains slowly.", location="Library restroom"))
+        self.assertEqual(r.status_code, 201, r.text)
+        p = r.json()["ai_analysis"]["priority"]
+        self.assertEqual(p["final"], r.json()["priority"])
+        self.assertIn(p["method"], {"random_forest", "rules"})
+        self.assertIn("rule_priority", p)
+
 if __name__=="__main__": unittest.main()

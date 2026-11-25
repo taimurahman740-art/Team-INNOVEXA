@@ -17,6 +17,7 @@ from .schemas import (
     StaffUserRead, StaffTokenRead, StaffSetupStatus,
 )
 from .image_recognition import classify_campus_image
+from .priority_model import predict_priority
 from .analytics import response_time_stats
 from .services import assess_safety_risk, choose_category, classify_issue, merge_image_hazard_risk, routing_reason, suggest_department, suggest_priority
 
@@ -235,9 +236,13 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     # Keyword risk uses only what the reporter wrote, so suggested text cannot count twice.
     risk_score, _, risk_reasons = assess_safety_risk(user_title, user_description)
     risk_score, risk_level, risk_reasons = merge_image_hazard_risk(risk_score, risk_reasons, analysis)
-    suggested_priority = suggest_priority(user_title, user_description) if has_user_text else ("High" if risk_score >= 5 else "Medium")
-    final_priority = "High" if risk_score >= 5 else (payload.priority or suggested_priority)
+    rule_priority = suggest_priority(user_title, user_description) if has_user_text else ("High" if risk_score >= 5 else "Medium")
+    prediction = predict_priority(category, title, description, payload.location, risk_score, rule_priority)
+    # Safety floor first; otherwise a priority chosen by the reporter, otherwise the model.
+    final_priority = "High" if risk_score >= 5 else (payload.priority or prediction["final"])
+    prediction["reporter_choice"] = payload.priority
     ai_analysis = {
+        "priority": prediction,
         "image_only": not has_user_text,
         "category_source": source,
         "routing_reason": routing_reason(category, source),

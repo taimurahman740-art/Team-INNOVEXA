@@ -29,6 +29,9 @@ async def lifespan(app: FastAPI):
         for name, definition in [("image_data","TEXT"),("classification_confidence","FLOAT"),("risk_score","INTEGER NOT NULL DEFAULT 0"),("risk_level","VARCHAR(20) NOT NULL DEFAULT 'Low'"),("risk_reasons","JSON NOT NULL DEFAULT '[]'"),("building","VARCHAR(80)"),("ai_analysis","JSON"),("equipment","VARCHAR(80)"),("resolution_note","TEXT")]:
             if name not in columns:
                 connection.execute(text(f"ALTER TABLE issues ADD COLUMN {name} {definition}"))
+    # Train the small priority model once at startup so the first report is not slowed down.
+    from .priority_model import get_model
+    get_model()
     yield
 
 app = FastAPI(title="INNOVEXA Smart Campus API", version="0.4.0", lifespan=lifespan)

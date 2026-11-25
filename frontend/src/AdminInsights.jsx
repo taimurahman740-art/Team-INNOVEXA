@@ -13,7 +13,7 @@ const FEATURES = [
   ["Automatic escalation and response-time management", "pending", "Response targets, overdue detection and alerts not built yet"],
   ["Maintenance dashboard and student tracking", "live", "Staff tasks and tracking codes"],
   ["Automatic department routing", "live", "Category to department, with reason shown"],
-  ["Machine-learning priority prediction", "partial", "Safety-rule priority today; trained model pending"],
+  ["Machine-learning priority prediction", "partial", "Random Forest baseline with a safety floor; resolution-time feature pending"],
   ["Computer-vision hazard detection and severity", "live", "Zero-shot CLIP, confirmed by staff"],
   ["Duplicate-ticket detection", "pending", "Image and text similarity not built yet"],
   ["Multimodal vision and text classification", "live", "Photo and description combined; photo-only reports"],

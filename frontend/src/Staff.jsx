@@ -9,6 +9,17 @@ const STATUS_FILTERS = [["open", "All open"], ["Submitted", "Submitted"], ["Assi
 const SORTS = [["priority", "Priority, then oldest"], ["oldest", "Oldest first"], ["newest", "Newest first"]];
 const emptyStaff = {full_name: "", email: "", password: "", department: "Facilities Maintenance", role: "staff"};
 
+/** Plain-language account of how the stored priority was decided (no model percentages). */
+function priorityExplanation(p) {
+  const parts = [p.method === "random_forest"
+    ? `The Random Forest model predicted ${p.predicted} priority.`
+    : "The priority model was unavailable, so keyword rules were used."];
+  if (p.safety_floor_applied) parts.push("The safety rules raised it to High.");
+  if (p.reporter_choice) parts.push(`The reporter selected ${p.reporter_choice}.`);
+  if (p.method === "random_forest" && p.rule_priority && p.rule_priority !== p.final) parts.push(`Keyword rules alone would have given ${p.rule_priority}.`);
+  return parts.join(" ");
+}
+
 function SignIn({s}) {
   const [email, setEmail] = useState(""), [password, setPassword] = useState(""), [bootstrapKey, setBootstrapKey] = useState(""), [fullName, setFullName] = useState("");
   return <section className="panel auth-card">
@@ -63,6 +74,11 @@ function TaskDrawer({issue, s, onClose, onResolve}) {
           <h3 className="section-title">AI routing <AiTag/></h3>
           <p className="prose">{ai.routing_reason}{ai.image_only ? " The reporter sent only a photo; the text was suggested from it." : ""}</p>
           {ai.image?.hazard && <div className="hazard hazard-found"><AlertTriangle size={16} aria-hidden="true"/><div><strong>Photo may show {ai.image.hazard.label.toLowerCase()}</strong><span>Confirm on site before closing the report.</span></div></div>}
+        </>}
+        {ai?.priority && <>
+          <h3 className="section-title">Priority prediction <AiTag/></h3>
+          <p className="prose">{priorityExplanation(ai.priority)}</p>
+          {ai.priority.factors?.length > 0 && <ul className="reason-list">{ai.priority.factors.map(f => <li key={f}>{f}</li>)}</ul>}
         </>}
         <PendingNotice title="Duplicate check">Similar-report detection (image and text similarity) is not implemented yet.</PendingNotice>
         <h3 className="section-title">Status history</h3>

@@ -31,6 +31,8 @@ jobs:
         run: python -m pytest -q
       - name: Run classifier holdout evaluation
         run: python -m app.evaluate_classifier
+      - name: Evaluate priority model against keyword rules (demonstration data)
+        run: python -m app.evaluate_priority
 
   frontend-build:
     runs-on: ubuntu-latest
