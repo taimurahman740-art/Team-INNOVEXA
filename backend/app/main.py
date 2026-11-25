@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
         if "assigned_staff_id" not in columns:
             connection.execute(text("ALTER TABLE issues ADD COLUMN assigned_staff_id INTEGER"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_issues_assigned_staff_id ON issues (assigned_staff_id)"))
-        for name, definition in [("image_data","TEXT"),("classification_confidence","FLOAT"),("risk_score","INTEGER NOT NULL DEFAULT 0"),("risk_level","VARCHAR(20) NOT NULL DEFAULT 'Low'"),("risk_reasons","JSON NOT NULL DEFAULT '[]'"),("building","VARCHAR(80)"),("ai_analysis","JSON")]:
+        for name, definition in [("image_data","TEXT"),("classification_confidence","FLOAT"),("risk_score","INTEGER NOT NULL DEFAULT 0"),("risk_level","VARCHAR(20) NOT NULL DEFAULT 'Low'"),("risk_reasons","JSON NOT NULL DEFAULT '[]'"),("building","VARCHAR(80)"),("ai_analysis","JSON"),("equipment","VARCHAR(80)"),("resolution_note","TEXT")]:
             if name not in columns:
                 connection.execute(text(f"ALTER TABLE issues ADD COLUMN {name} {definition}"))
     yield

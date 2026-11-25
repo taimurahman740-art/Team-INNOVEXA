@@ -11,6 +11,7 @@ vi.mock("./api.js",()=>({
   getStaffIssues:vi.fn(),getStaffUsers:vi.fn(),createStaffUser:vi.fn(),
   assignIssue:vi.fn(),getIssueHistory:vi.fn(),
   changeStaffPassword:vi.fn(),setStaffActive:vi.fn(),resetStaffPassword:vi.fn(),
+  getResponseTimes:vi.fn(()=>Promise.resolve(null)),
 }));
 afterEach(()=>{cleanup();vi.clearAllMocks();});
 
@@ -47,7 +48,9 @@ describe("individual staff task centre",()=>{
     await user.type(await screen.findByLabelText("Email"),"admin@campus.test");
     await user.type(screen.getByLabelText("Password"),"secure-admin-password");
     await user.click(screen.getByRole("button",{name:"Sign in"}));
-    expect(await screen.findByText("Create staff account")).toBeInTheDocument();
+    await user.click(await screen.findByRole("tab",{name:"Team"}));
+    expect(screen.getByText("Create staff account")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab",{name:"Tasks"}));
     const assignment=screen.getByLabelText("Assign to");
     await user.selectOptions(assignment,"7");
     expect(api.assignIssue).toHaveBeenCalledWith(42,7,"test-session-token");
@@ -80,6 +83,7 @@ describe("individual staff task centre",()=>{
     await user.type(screen.getByLabelText("Password"),"secure-staff-password");
     await user.click(screen.getByRole("button",{name:"Sign in"}));
     await screen.findByText("Campus Technician");
+    await user.click(screen.getByRole("tab",{name:"Account"}));
     await user.type(screen.getByLabelText("Current password"),"secure-staff-password");
     await user.type(screen.getByLabelText("New password (minimum 12 characters)"),"another-secure-password");
     await user.click(screen.getByRole("button",{name:"Update password"}));

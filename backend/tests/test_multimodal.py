@@ -43,12 +43,14 @@ class InterpretTests(unittest.TestCase):
         self.assertIsNone(r["hazard"])
         self.assertTrue(r["suggested_title"])
         self.assertTrue(r["requires_human_review"])
+        self.assertEqual(r["match_strength"], "strong")
 
     def test_unclear_photo_asks_for_more_information(self):
         r = interpret_predictions(category_preds({"Plumbing": 0.30, "Facility": 0.25}), hazard_preds(None, 0.6), "m")
         self.assertTrue(r["needs_more_info"])
         self.assertIsNone(r["suggested_title"])
         self.assertIsNone(r["suggested_description"])
+        self.assertEqual(r["match_strength"], "uncertain")
 
     def test_close_scores_ask_for_more_information(self):
         r = interpret_predictions(category_preds({"Plumbing": 0.42, "Facility": 0.38}), None, "m")
@@ -59,6 +61,10 @@ class InterpretTests(unittest.TestCase):
         self.assertEqual(r["hazard"]["key"], "exposed_wiring")
         self.assertEqual(r["hazard"]["risk_points"], 5)
         self.assertIn("exposed electrical wiring", r["suggested_title"].lower())
+        self.assertEqual(r["recommended_department"], "Electrical Maintenance")
+        self.assertEqual(r["estimated_priority"], "High")
+        self.assertEqual(r["suggested_severity"], "High")
+        self.assertNotIn("%", r["suggested_description"])
 
     def test_weak_hazard_is_ignored(self):
         r = interpret_predictions(category_preds({"Facility": 0.7}), hazard_preds("structural_crack", 0.3), "m")

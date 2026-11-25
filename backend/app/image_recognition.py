@@ -15,6 +15,8 @@ import os
 
 from huggingface_hub import InferenceClient
 
+from .services import suggest_department
+
 CANDIDATE_LABELS = {
     "Facility": "a photo of damaged campus facilities such as broken furniture, doors, windows, ceilings, walls or elevators",
     "Electrical": "a photo of electrical problems such as damaged sockets, exposed wires, broken lights or electrical panels",
@@ -27,6 +29,8 @@ CANDIDATE_LABELS = {
 }
 
 # key -> (prompt, human label, risk points added to the safety score, default category)
+# Suggested severity per hazard (a triage suggestion, confirmed by staff on site).
+HAZARD_SEVERITY = {"exposed_wiring": "High", "structural_crack": "Medium", "water_pooling": "Medium", "broken_glass": "Medium"}
 HAZARDS = {
     "exposed_wiring": ("a photo of exposed or bare electrical wires hanging out of a wall, ceiling or socket", "Exposed electrical wiring", 5, "Electrical"),
     "water_pooling": ("a photo of a puddle of standing water pooling on an indoor floor", "Water pooling on the floor", 2, "Plumbing"),
@@ -114,6 +118,12 @@ def interpret_predictions(category_predictions, hazard_predictions, model: str) 
         "suggested_title": None,
         "suggested_description": None,
         "message": None,
+        "recommended_department": suggest_department(category),
+        # Qualitative: CLIP scores are relative similarities between prompts, not calibrated accuracy.
+        "match_strength": "uncertain" if uncertain else ("strong" if best_score >= 0.6 and margin >= 0.25 else "moderate"),
+        "suggested_severity": HAZARD_SEVERITY.get(hazard["key"]) if hazard else None,
+        # From the photo alone. The final priority is set on submit, using the description too.
+        "estimated_priority": ("High" if hazard and hazard["risk_points"] >= 5 else "Medium" if hazard else None),
     }
     if uncertain:
         result["message"] = "The photo is not clear enough to identify the problem. Please add a short title and description."
@@ -121,10 +131,10 @@ def interpret_predictions(category_predictions, hazard_predictions, model: str) 
 
     if hazard:
         title = f"Possible {hazard['label'].lower()}"
-        seen = f"{hazard['label'].lower()} ({round(hazard['score'] * 100)}% match)"
+        seen = f"possible {hazard['label'].lower()}"
     else:
         title = SUGGESTED_TITLES[category]
-        seen = f"a {category} issue ({round(result['score'] * 100)}% match)"
+        seen = f"a {SUGGESTED_TITLES[category].lower()}"
     result["suggested_title"] = title
     result["suggested_description"] = (
         f"Photo report. The image appears to show {seen}. "

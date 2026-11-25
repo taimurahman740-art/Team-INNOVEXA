@@ -195,4 +195,24 @@ class IssueApiTests(unittest.TestCase):
         self.assertEqual(r.json()["category"], "Plumbing")
         self.assertEqual(r.json()["ai_analysis"]["category_source"], "user")
 
+    def test_response_time_analytics_requires_admin(self):
+        self.assertEqual(self.client.get("/issues/analytics/response-times").status_code, 401)
+
+    def staff_session(self):
+        r=self.client.post("/issues/staff/bootstrap",json={"bootstrap_key":"test-bootstrap-key","email":"admin@campus.test","full_name":"Campus Admin","password":"secure-admin-password","department":"Campus Administration"})
+        return {"Authorization":f"Bearer {r.json()['access_token']}"}
+
+    def test_equipment_is_saved(self):
+        r = self.client.post("/issues", json=self.payload(equipment="Projector"))
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(r.json()["equipment"], "Projector")
+
+    def test_resolution_note_is_saved_with_status(self):
+        headers = self.staff_session()
+        issue = self.client.post("/issues", json=self.payload()).json()
+        r = self.client.patch(f"/issues/{issue['id']}/status", json={"status": "Resolved", "resolution_note": "Replaced the ballast."}, headers=headers)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["resolution_note"], "Replaced the ballast.")
+        self.assertEqual(r.json()["status"], "Resolved")
+
 if __name__=="__main__": unittest.main()

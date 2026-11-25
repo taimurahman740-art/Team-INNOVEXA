@@ -42,6 +42,7 @@ class IssueCreate(BaseModel):
     building: str | None = Field(default=None, max_length=80)
     floor: str | None = Field(default=None, max_length=20)
     room: str | None = Field(default=None, max_length=40)
+    equipment: str | None = Field(default=None, max_length=80)
     # None or "Other" means "let INNOVEXA decide".
     category: Category | None = None
     priority: Priority | None = None
@@ -60,6 +61,8 @@ class ImageClassificationRequest(BaseModel):
     image_data: str = Field(min_length=30, max_length=2_800_000)
 class IssueStatusUpdate(BaseModel):
     status: Status
+    # Optional work note saved with the update (for example, what was repaired).
+    resolution_note: str | None = Field(default=None, max_length=2000)
 class IssueAssignmentUpdate(BaseModel):
     staff_user_id: int | None = Field(default=None, ge=1)
 class StaffLogin(BaseModel):
@@ -111,6 +114,8 @@ class IssueRead(BaseModel):
     risk_reasons: list[str] = Field(default_factory=list)
     tracking_code: str | None = None
     building: str | None = None
+    equipment: str | None = None
+    resolution_note: str | None = None
     ai_analysis: dict | None = None
     created_at: datetime
 class IssuePublicRead(BaseModel):

@@ -17,6 +17,7 @@ from .schemas import (
     StaffUserRead, StaffTokenRead, StaffSetupStatus,
 )
 from .image_recognition import classify_campus_image
+from .analytics import response_time_stats
 from .services import assess_safety_risk, choose_category, classify_issue, merge_image_hazard_risk, routing_reason, suggest_department, suggest_priority
 
 router = APIRouter(prefix="/issues", tags=["issues"])
@@ -155,9 +156,15 @@ def update_status(issue_id: int, payload: IssueStatusUpdate, user: StaffUser = D
         raise HTTPException(status_code=404, detail="Issue not found")
     if not _can_work(issue, user):
         raise HTTPException(status_code=403, detail="This report is assigned to another department or staff member.")
+    changed = False
     if issue.status != payload.status:
         db.add(IssueStatusHistory(issue_id=issue.id, old_status=issue.status, new_status=payload.status, changed_by=user.email[:80]))
         issue.status = payload.status
+        changed = True
+    if payload.resolution_note is not None:
+        issue.resolution_note = payload.resolution_note.strip() or None
+        changed = True
+    if changed:
         db.commit()
     db.refresh(issue)
     return issue
@@ -180,6 +187,14 @@ def assign_issue(issue_id: int, payload: IssueAssignmentUpdate, admin: StaffUser
     db.commit()
     db.refresh(issue)
     return issue
+
+
+@router.get("/analytics/response-times")
+def analytics_response_times(admin: StaffUser = Depends(require_admin), db: Session = Depends(get_db)):
+    """Real response and resolution times from status history (administrators only)."""
+    issues = [{"id": i.id, "created_at": i.created_at, "department": i.department, "priority": i.priority} for i in db.scalars(select(Issue)).all()]
+    history = [{"issue_id": h.issue_id, "new_status": h.new_status, "changed_at": h.changed_at} for h in db.scalars(select(IssueStatusHistory)).all()]
+    return response_time_stats(issues, history)
 
 
 @router.get("/{issue_id}/history", response_model=list[IssueStatusHistoryRead])
@@ -230,7 +245,7 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
     }
     if analysis:
         ai_analysis["image"] = {k: analysis.get(k) for k in ("category", "score", "category_scores", "hazard", "model")}
-    issue = Issue(title=title, description=description, location=payload.location.strip(), building=(payload.building or "").strip() or None, category=category, priority=final_priority, status="Submitted", department=suggest_department(category), image_data=payload.image_data, classification_confidence=round(confidence, 4), risk_score=risk_score, risk_level=risk_level, risk_reasons=risk_reasons, ai_analysis=ai_analysis)
+    issue = Issue(title=title, description=description, location=payload.location.strip(), building=(payload.building or "").strip() or None, equipment=(payload.equipment or "").strip() or None, category=category, priority=final_priority, status="Submitted", department=suggest_department(category), image_data=payload.image_data, classification_confidence=round(confidence, 4), risk_score=risk_score, risk_level=risk_level, risk_reasons=risk_reasons, ai_analysis=ai_analysis)
     db.add(issue)
     db.flush()
     db.add(IssueStatusHistory(issue_id=issue.id, old_status=None, new_status="Submitted", changed_by="system"))

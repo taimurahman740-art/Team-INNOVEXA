@@ -296,6 +296,6 @@ def merge_image_hazard_risk(score: int, reasons: list[str], image_analysis: dict
     hazard = (image_analysis or {}).get("hazard")
     if hazard and hazard.get("risk_points"):
         score = min(10, score + int(hazard["risk_points"]))
-        reasons.append(f"Photo may show {hazard['label'].lower()} (AI {round(float(hazard['score']) * 100)}% match, staff must confirm)")
+        reasons.append(f"Photo may show {hazard['label'].lower()} (AI suggestion, staff must confirm)")
     level = "High" if score >= 5 else "Moderate" if score >= 2 else "Low"
     return score, level, reasons

@@ -12,7 +12,7 @@ export default defineConfig({
         name: "INNOVEXA Smart Campus",
         short_name: "INNOVEXA",
         description: "Smart Campus Facility and Issue Management System",
-        theme_color: "#123B66",
+        theme_color: "#14243A",
         background_color: "#ffffff",
         display: "standalone",
         orientation: "portrait",
