@@ -1,3 +1,5 @@
+> **Production database: Neon PostgreSQL (since 2026-11-25).** The Render PostgreSQL steps below apply only to the old database, which is kept until the Neon setup and a backup restore are verified. Check the production connection with `backend/scripts/verify_database.py`. Never point `DATABASE_URL` back at the Render database.
+
 # INNOVEXA database recovery
 
 This repository contains the backend code and the database structure needed to recreate a fresh database. It does not contain a backup of live report records.

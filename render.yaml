@@ -8,10 +8,10 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      # Production database is Neon PostgreSQL. The connection string is set in the
+      # Render dashboard and must not be synced from the old Render database below.
       - key: DATABASE_URL
-        fromDatabase:
-          name: innovexa-db
-          property: connectionString
+        sync: false
       - key: FRONTEND_ORIGINS
         value: "*"
 
@@ -28,6 +28,8 @@ services:
           name: innovexa-api
           property: host
 
+# Old Render PostgreSQL. Kept, untouched, until the Neon setup and a backup restore
+# are verified. Do not delete it and do not point DATABASE_URL back at it.
 databases:
   - name: innovexa-db
     plan: free
